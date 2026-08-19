@@ -1,0 +1,2063 @@
+[
+  {
+    "name": "cert-fr",
+    "url": "https://www.cert.ssi.gouv.fr/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "cert",
+    "notes": ""
+  },
+  {
+    "name": "cisa-advisories",
+    "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "cert",
+    "notes": ""
+  },
+  {
+    "name": "acsc-news",
+    "url": "https://www.cyber.gov.au/rss/news",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "cert",
+    "notes": ""
+  },
+  {
+    "name": "cert-pl",
+    "url": "https://cert.pl/en/rss.xml",
+    "country": "Poland",
+    "country_code": "PL",
+    "confidence": 1,
+    "category": "cert",
+    "notes": ""
+  },
+  {
+    "name": "ncsc-uk",
+    "url": "https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "cert",
+    "notes": ""
+  },
+  {
+    "name": "databreaches-net",
+    "url": "https://www.databreaches.net/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "breach",
+    "notes": ""
+  },
+  {
+    "name": "bleepingcomputer",
+    "url": "https://www.bleepingcomputer.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "thehackernews",
+    "url": "https://feeds.feedburner.com/TheHackersNews",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "securelist",
+    "url": "https://securelist.com/feed/",
+    "country": "Global",
+    "country_code": "ZZ",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "malwarebytes",
+    "url": "https://blog.malwarebytes.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "unit42",
+    "url": "https://unit42.paloaltonetworks.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "crowdstrike",
+    "url": "https://www.crowdstrike.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "schneier",
+    "url": "https://www.schneier.com/blog/atom.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "recordedfuture",
+    "url": "https://www.recordedfuture.com/feed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "ransomware-live-rss",
+    "url": "https://www.ransomware.live/rss.xml",
+    "country": "Global",
+    "country_code": "ZZ",
+    "confidence": 2,
+    "category": "ransomware",
+    "notes": ""
+  },
+  {
+    "name": "undercodenews",
+    "url": "https://undercodenews.com/feed/",
+    "country": "Global",
+    "country_code": "ZZ",
+    "confidence": 2,
+    "category": "news",
+    "notes": "undercodenews.com WordPress RSS"
+  },
+  {
+    "name": "www-cybereason-com",
+    "url": "https://www.cybereason.com/blog/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-acunetix-com",
+    "url": "https://www.acunetix.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "securityintelligence-com",
+    "url": "https://securityintelligence.com/news/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-exabeam-com",
+    "url": "https://www.exabeam.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cylance-com",
+    "url": "https://www.cylance.com/rss/GlobalCylanceThreatReport",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "labs-withsecure-com",
+    "url": "https://labs.withsecure.com/publications",
+    "country": "Finland",
+    "country_code": "FI",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-techtarget-com",
+    "url": "https://www.techtarget.com/searchsecurity/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-feedburner-com",
+    "url": "https://feeds.feedburner.com/nakedsecurity",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-feedburner-com",
+    "url": "https://feeds.feedburner.com/ctovision",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-sentinelone-com",
+    "url": "https://www.sentinelone.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-ibm-com",
+    "url": "https://www.ibm.com/blogs/security/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-imperva-com",
+    "url": "https://www.imperva.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-qualys-com",
+    "url": "https://blog.qualys.com/feed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-checkpoint-com",
+    "url": "https://blog.checkpoint.com/feed/",
+    "country": "Israel",
+    "country_code": "IL",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "duo-com",
+    "url": "https://duo.com/feed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-feedburner-com",
+    "url": "https://feeds.feedburner.com/cyberark",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-sucuri-net",
+    "url": "https://blog.sucuri.net/feed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kaspersky-com",
+    "url": "https://www.kaspersky.com/blog/feed/",
+    "country": "Russia",
+    "country_code": "RU",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-veracode-com",
+    "url": "https://www.veracode.com/blog/feed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "heimdalsecurity-com",
+    "url": "https://heimdalsecurity.com/blog/feed/",
+    "country": "Denmark",
+    "country_code": "DK",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-talosintelligence-com",
+    "url": "https://blog.talosintelligence.com/rss/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-feedburner-com",
+    "url": "https://feeds.feedburner.com/TheSecurityLedger",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "techcrunch-com",
+    "url": "https://techcrunch.com/tag/cybersecurity/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "itsecuritynews-info",
+    "url": "https://itsecuritynews.info/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-silicon-co-uk",
+    "url": "https://www.silicon.co.uk/category/security/feed",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-techrepublic-com",
+    "url": "https://www.techrepublic.com/rssfeeds/topic/security/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-securitynewspaper-com",
+    "url": "https://www.securitynewspaper.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "securityboulevard-com",
+    "url": "https://securityboulevard.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-feedburner-com",
+    "url": "http://feeds.feedburner.com/TheHackersNews",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-clearnetwork-com",
+    "url": "https://www.clearnetwork.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "lab-wallarm-com",
+    "url": "https://lab.wallarm.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cybersecuritycloudexpo-com",
+    "url": "https://www.cybersecuritycloudexpo.com/feed/",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-empowerelearning-com",
+    "url": "https://www.empowerelearning.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-virtru-com",
+    "url": "https://www.virtru.com/blog/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-canarytrap-com",
+    "url": "https://www.canarytrap.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-ignyteplatform-com",
+    "url": "https://www.ignyteplatform.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyberpilot-io",
+    "url": "https://www.cyberpilot.io/cyberpilot-blog/rss.xml",
+    "country": "Denmark",
+    "country_code": "DK",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-tsfactory-com",
+    "url": "https://www.tsfactory.com/forums/blogs/category/infosec-digest/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-idsalliance-org",
+    "url": "https://www.idsalliance.org/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-erdalozkaya-com",
+    "url": "https://www.erdalozkaya.com/feed/",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "be4sec-com",
+    "url": "https://be4sec.com/feed/",
+    "country": "Belgium",
+    "country_code": "BE",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "wesecureapp-com",
+    "url": "https://wesecureapp.com/feed/",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "dataprivacymanager-net",
+    "url": "https://dataprivacymanager.net/feed/",
+    "country": "Croatia",
+    "country_code": "HR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-vistainfosec-com",
+    "url": "https://www.vistainfosec.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cm-alliance-com",
+    "url": "https://www.cm-alliance.com/cybersecurity-blog/rss.xml",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "any-run",
+    "url": "https://any.run/cybersecurity-blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "tacsecurity-com",
+    "url": "https://tacsecurity.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-entersoftsecurity-com",
+    "url": "https://blog.entersoftsecurity.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyberdb-co",
+    "url": "https://www.cyberdb.co/blog/?utm_source=feedspot",
+    "country": "Israel",
+    "country_code": "IL",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-securityinnovation-com",
+    "url": "https://blog.securityinnovation.com/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "socprime-com",
+    "url": "https://socprime.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "sectigostore-com",
+    "url": "https://sectigostore.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-seqrite-com",
+    "url": "https://www.seqrite.com/blog/feed/",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-webroot-com",
+    "url": "https://www.webroot.com/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blogs-quickheal-com",
+    "url": "https://blogs.quickheal.com/feed/",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-acunetix-com",
+    "url": "https://www.acunetix.com/blog/?utm_source=feedspot",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-scnsoft-com",
+    "url": "https://www.scnsoft.com/blog/category/information-security/atom",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-proofpoint-com",
+    "url": "https://www.proofpoint.com/us/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-nist-gov",
+    "url": "https://www.nist.gov/blogs/cybersecurity-insights/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cyble-com",
+    "url": "https://cyble.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "olukaiiisosicyber-tech",
+    "url": "https://olukaiiisosicyber.tech/f.atom",
+    "country": "Nigeria",
+    "country_code": "NG",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-zataz-com",
+    "url": "https://www.zataz.com/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-datasecuritybreach-fr",
+    "url": "https://www.datasecuritybreach.fr/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-undernews-fr",
+    "url": "https://www.undernews.fr/feed",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-knowbe4-com",
+    "url": "https://blog.knowbe4.com/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-malwarebytes-com",
+    "url": "https://www.malwarebytes.com/blog/feed/index.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-hackercombat-com",
+    "url": "https://www.hackercombat.com/feed/",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-helpnetsecurity-com",
+    "url": "https://www.helpnetsecurity.com/rss",
+    "country": "Slovenia",
+    "country_code": "SI",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-hackingarticles-in",
+    "url": "https://www.hackingarticles.in/feed/",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-schneier-com",
+    "url": "https://www.schneier.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-welivesecurity-com",
+    "url": "https://www.welivesecurity.com/en/rss/feed/",
+    "country": "Slovakia",
+    "country_code": "SK",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "isc-sans-edu",
+    "url": "https://isc.sans.edu/xml.html",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cybersguards-com",
+    "url": "https://cybersguards.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kb-cert-org",
+    "url": "https://www.kb.cert.org/vuls/atomfeed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-schneier-com",
+    "url": "https://www.schneier.com/feed/atom/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "schneier-com",
+    "url": "http://schneier.com/blog/atom.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-welivesecurity-com",
+    "url": "https://www.welivesecurity.com/feed/",
+    "country": "Slovakia",
+    "country_code": "SK",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-incibe-cert-es",
+    "url": "https://www.incibe-cert.es/feed/avisos-seguridad/all",
+    "country": "Spain",
+    "country_code": "ES",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cert-ssi-gouv-fr",
+    "url": "https://www.cert.ssi.gouv.fr/ioc/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cert-ssi-gouv-fr",
+    "url": "https://www.cert.ssi.gouv.fr/cti/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "nakedsecurity-sophos-com",
+    "url": "https://nakedsecurity.sophos.com/feed/",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-jpcert-or-jp",
+    "url": "https://www.jpcert.or.jp/english/rss/jpcert-en.rdf",
+    "country": "Japan",
+    "country_code": "JP",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kb-cert-org",
+    "url": "https://www.kb.cert.org/vuls/atomfeed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "isc-sans-edu",
+    "url": "https://isc.sans.edu/rssfeed.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "linuxsecurity-com",
+    "url": "https://linuxsecurity.com/linuxsecurity_articles.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-debian-org",
+    "url": "https://www.debian.org/security/dsa",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "alas-aws-amazon-com",
+    "url": "https://alas.aws.amazon.com/alas.rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-feedburner-com",
+    "url": "https://feeds.feedburner.com/feedburner/Talos?format=xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cert-ssi-gouv-fr",
+    "url": "https://www.cert.ssi.gouv.fr/alerte/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "korben-info",
+    "url": "https://korben.info/feed",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "krebsonsecurity-com",
+    "url": "https://krebsonsecurity.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blogs-vmware-com",
+    "url": "https://blogs.vmware.com/security/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-infosecurity-magazine-com",
+    "url": "https://www.infosecurity-magazine.com/rss/webinars/",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "security-stackexchange-com",
+    "url": "https://security.stackexchange.com/feeds",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-phishlabs-com",
+    "url": "https://www.phishlabs.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-us-cert-gov",
+    "url": "https://www.us-cert.gov/ncas/alerts.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-cloudflare-com",
+    "url": "https://blog.cloudflare.com/rss/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "thehackernews-com",
+    "url": "https://thehackernews.com/feeds/posts/default",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-weforum-org",
+    "url": "https://www.weforum.org/agenda/cybersecurity/feed/",
+    "country": "Switzerland",
+    "country_code": "CH",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-hackread-com",
+    "url": "https://www.hackread.com/feed/",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-computerweekly-com",
+    "url": "https://www.computerweekly.com/rss/All-Computer-Weekly-content.xml",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyberscoop-com",
+    "url": "https://www.cyberscoop.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-infosecurity-magazine-com",
+    "url": "https://www.infosecurity-magazine.com/rss/blogs/",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-wired-com",
+    "url": "https://www.wired.com/feed/category/security/latest/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cisomag-com",
+    "url": "https://www.cisomag.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "securityparrot-com",
+    "url": "https://securityparrot.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-jbspeakr-cc",
+    "url": "https://www.jbspeakr.cc/index.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-theguardian-com",
+    "url": "https://www.theguardian.com/technology/data-computer-security/rss",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-secureblink-com",
+    "url": "https://www.secureblink.com/rss-feeds/threat-feed",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-exploitone-com",
+    "url": "https://www.exploitone.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "adamlevin-com",
+    "url": "https://adamlevin.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-tripwire-com",
+    "url": "https://www.tripwire.com/state-of-security/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "securityaffairs-co",
+    "url": "http://securityaffairs.co/wordpress/feed",
+    "country": "Italy",
+    "country_code": "IT",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blog-zonealarm-com",
+    "url": "https://blog.zonealarm.com/feed/",
+    "country": "Israel",
+    "country_code": "IL",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-computerworld-com",
+    "url": "https://www.computerworld.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "medium-com",
+    "url": "https://medium.com/feed/@vaceituno",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "davinciforensics-co-za",
+    "url": "https://davinciforensics.co.za/cybersecurity/feed/",
+    "country": "South Africa",
+    "country_code": "ZA",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "medium-com",
+    "url": "https://medium.com/feed/@2ndsightlab",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "ventureinsecurity-net",
+    "url": "https://ventureinsecurity.net/feed",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cybersecuritynews-com",
+    "url": "https://cybersecuritynews.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cybersecuritydive-com",
+    "url": "https://www.cybersecuritydive.com/feeds/news/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "economictimes-indiatimes-com",
+    "url": "https://economictimes.indiatimes.com/tech/information-tech/rssfeeds/78570530.cms",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cybersecurityventures-com",
+    "url": "https://cybersecurityventures.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyber-gov-au",
+    "url": "https://www.cyber.gov.au/rss/alerts",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "thecyberexpress-com",
+    "url": "https://thecyberexpress.com/feed/",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cio-economictimes-indiatimes-com",
+    "url": "https://cio.economictimes.indiatimes.com/rss/internet",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cio-economictimes-indiatimes-com",
+    "url": "https://cio.economictimes.indiatimes.com/rss/data-center",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cio-economictimes-indiatimes-com",
+    "url": "https://cio.economictimes.indiatimes.com/rss/digital-security",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cio-economictimes-indiatimes-com",
+    "url": "https://cio.economictimes.indiatimes.com/rss/next-gen-technologies",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-securitymagazine-com",
+    "url": "https://www.securitymagazine.com/rss/topic/2236",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "siecledigital-fr",
+    "url": "https://siecledigital.fr/cybersecurite/feed/",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-itpro-com",
+    "url": "https://www.itpro.com/feeds/tag/security",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-homelandsecuritynewswire-com",
+    "url": "https://www.homelandsecuritynewswire.com/topics/cybersecurity",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "marcoramilli-com",
+    "url": "https://marcoramilli.com/feed/",
+    "country": "Italy",
+    "country_code": "IT",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-troyhunt-com",
+    "url": "https://www.troyhunt.com/rss/",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-securityweek-com",
+    "url": "https://www.securityweek.com/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cybersafe-news",
+    "url": "https://cybersafe.news/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-govinfosecurity-com",
+    "url": "https://www.govinfosecurity.com/rss-feeds",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyberdefensemagazine-com",
+    "url": "https://www.cyberdefensemagazine.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-securityweek-com",
+    "url": "https://www.securityweek.com/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cisa-gov",
+    "url": "https://www.cisa.gov/uscert/ics/advisories/advisories.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyber-gov-au",
+    "url": "https://www.cyber.gov.au/acsc/view-all-content/alerts/rss",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-darkreading-com",
+    "url": "https://www.darkreading.com/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-zdnet-com",
+    "url": "https://www.zdnet.com/blog/security/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "securityaffairs-co",
+    "url": "https://securityaffairs.co/feed",
+    "country": "Italy",
+    "country_code": "IT",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cyber-gov-au",
+    "url": "https://www.cyber.gov.au/acsc/view-all-content/advisories/rss",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-theregister-com",
+    "url": "https://www.theregister.com/security/headlines.atom",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cisa-gov",
+    "url": "https://www.cisa.gov/uscert/ncas/alerts.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/cert-fr.bsky.social/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/anssi-fr.bsky.social/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/haveibeenpwned.com/rss",
+    "country": "Australia",
+    "country_code": "AU",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/sekoia.io/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/virusbtn.bsky.social/rss",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/falconfeedsio.bsky.social/rss",
+    "country": "India",
+    "country_code": "IN",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/osintcombine.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/cybdetective.bsky.social/rss",
+    "country": "Russia",
+    "country_code": "RU",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/campuscodi.risky.biz/rss",
+    "country": "Romania",
+    "country_code": "RO",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/vulnerability-lookup.social.circl.lu.ap.brid.gy/rss",
+    "country": "Luxembourg",
+    "country_code": "LU",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/infosec.skyfleet.blue/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/cve.skyfleet.blue/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/hackingne.ws/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/ransomwaresommelier.com/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/itarmy-ua.bsky.social/rss",
+    "country": "Ukraine",
+    "country_code": "UA",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/hackread.bsky.social/rss",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 2,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/dinosn.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/hacker.at.thenote.app/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/keesnk.bsky.social/rss",
+    "country": "Netherlands",
+    "country_code": "NL",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/headteacherupdate.bsky.social/rss",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/reconbee.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/heitec.bsky.social/rss",
+    "country": "Germany",
+    "country_code": "DE",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/happygeek.bsky.social/rss",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/ninjaowl.ai/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/untersin.gr/rss",
+    "country": "Greece",
+    "country_code": "GR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/onyphe.io/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/gabrielthierry.bsky.social/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/derutyf.bsky.social/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/cedricpernet.bsky.social/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/undercodenews.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/taltechtreks.com/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/cyber-asia.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/cti-news.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/techhelpkb.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/mbissey.bsky.social/rss",
+    "country": "France",
+    "country_code": "FR",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/geekfeed.bsky.social/rss",
+    "country": "Japan",
+    "country_code": "JP",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/seifreed.bsky.social/rss",
+    "country": "Sweden",
+    "country_code": "SE",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/rcinghio.bsky.social/rss",
+    "country": "Italy",
+    "country_code": "IT",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/technadu.com/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/innovirtuoso.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/pearswick.press/rss",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/peter-ruairc.bsky.social/rss",
+    "country": "Ireland",
+    "country_code": "IE",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/lorenzofb.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "bsky-app",
+    "url": "https://bsky.app/profile/technijian.bsky.social/rss",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 3,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cerist-dz",
+    "url": "http://www.cerist.dz/index.php/en/?format=feed&type=rss",
+    "country": "Algeria",
+    "country_code": "DZ",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cert-at",
+    "url": "https://cert.at/cert-at.en.blog.rss_2.0.xml",
+    "country": "Austria",
+    "country_code": "AT",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cert-be",
+    "url": "https://cert.be/en/rss",
+    "country": "Belgium",
+    "country_code": "BE",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cyber-gc-ca",
+    "url": "https://cyber.gc.ca/webservice/en/rss/alerts",
+    "country": "Canada",
+    "country_code": "CA",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cyber-gc-ca",
+    "url": "https://cyber.gc.ca/webservice/en/rss/news",
+    "country": "Canada",
+    "country_code": "CA",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-egcert-eg",
+    "url": "https://www.egcert.eg/feed/",
+    "country": "Egypt",
+    "country_code": "EG",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kyberturvallisuuskeskus-fi",
+    "url": "https://www.kyberturvallisuuskeskus.fi/feed/rss/en",
+    "country": "Finland",
+    "country_code": "FI",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kyberturvallisuuskeskus-fi",
+    "url": "https://www.kyberturvallisuuskeskus.fi/sites/default/files/rss/news.xml",
+    "country": "Finland",
+    "country_code": "FI",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kyberturvallisuuskeskus-fi",
+    "url": "https://www.kyberturvallisuuskeskus.fi/sites/default/files/rss/vulns.xml",
+    "country": "Finland",
+    "country_code": "FI",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-kyberturvallisuuskeskus-fi",
+    "url": "https://www.kyberturvallisuuskeskus.fi/feed/rss/en/399",
+    "country": "Finland",
+    "country_code": "FI",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-govcert-gov-hk",
+    "url": "https://www.govcert.gov.hk/en/rss_security_alerts.xml",
+    "country": "Hong Kong",
+    "country_code": "HK",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-hkcert-org",
+    "url": "https://www.hkcert.org/getrss/security-bulletin",
+    "country": "Hong Kong",
+    "country_code": "HK",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "blogs-jpcert-or-jp",
+    "url": "https://blogs.jpcert.or.jp/en/atom.xml",
+    "country": "Japan",
+    "country_code": "JP",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "cert-lv",
+    "url": "https://cert.lv/en/feed/rss/all",
+    "country": "Latvia",
+    "country_code": "LV",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "feeds-english-ncsc-nl",
+    "url": "https://feeds.english.ncsc.nl/news.rss",
+    "country": "Netherlands",
+    "country_code": "NL",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cert-si",
+    "url": "https://www.cert.si/en/category/news/feed/",
+    "country": "Slovenia",
+    "country_code": "SI",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-ccn-cert-cni-es",
+    "url": "https://www.ccn-cert.cni.es/component/obrss/rss-ultimas-vulnerabilidades.feed",
+    "country": "Spain",
+    "country_code": "ES",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-govcert-ch",
+    "url": "https://www.govcert.ch/blog/rss.xml",
+    "country": "Switzerland",
+    "country_code": "CH",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-govcert-ch",
+    "url": "https://www.govcert.ch/whitepapers/rss.xml",
+    "country": "Switzerland",
+    "country_code": "CH",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-ncsc-gov-uk",
+    "url": "https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml",
+    "country": "United Kingdom",
+    "country_code": "GB",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  },
+  {
+    "name": "www-cisa-gov",
+    "url": "https://www.cisa.gov/uscert/ncas/all.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 1,
+    "category": "news",
+    "notes": "watcher"
+  }
+]

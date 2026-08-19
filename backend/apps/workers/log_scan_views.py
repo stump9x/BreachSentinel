@@ -1,0 +1,395 @@
+"""API for Logs Scanner: upload dumps, keyword scan, keep hits."""
+
+from __future__ import annotations
+
+import uuid
+
+from django.db.models import Q
+from django.utils.dateparse import parse_date
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.core.crypto import decrypt_secret
+from apps.core.permissions import IsStaffUser
+from apps.workers.log_scanner import (
+    delete_upload,
+    finalize_upload_chunks,
+    max_files_per_scan,
+    max_hits_per_scan,
+    max_upload_bytes,
+    store_upload_chunk,
+    store_upload_file,
+)
+from apps.workers.models import LogScan, LogScanHit, LogUpload
+from apps.workers.tasks import run_log_scan_task
+
+
+class LogUploadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LogUpload
+        fields = (
+            "id",
+            "original_name",
+            "size_bytes",
+            "sha256",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class LogUploadChunkView(APIView):
+    """Receive resumable upload chunks for large Logs Scanner files."""
+
+    permission_classes = [IsStaffUser]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        chunk = request.FILES.get("chunk")
+        if chunk is None:
+            return Response(
+                {"detail": "Missing multipart field 'chunk'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            upload_id = uuid.UUID(str(request.data.get("upload_id") or ""))
+            original_name = str(request.data.get("file_name") or chunk.name)
+            file_size = int(request.data.get("file_size") or 0)
+            total_chunks = int(request.data.get("total_chunks") or 0)
+            chunk_index = int(request.data.get("chunk_index") or 0)
+            result = store_upload_chunk(
+                uploaded_file=chunk,
+                user=request.user,
+                upload_id=upload_id,
+                original_name=original_name,
+                file_size=file_size,
+                total_chunks=total_chunks,
+                chunk_index=chunk_index,
+            )
+            if result.get("upload"):
+                row = result["upload"]
+                return Response(
+                    {
+                        "complete": True,
+                        "received_bytes": file_size,
+                        "upload": LogUploadSerializer(row).data,
+                    }
+                )
+            if result["complete"]:
+                row = finalize_upload_chunks(
+                    user=request.user,
+                    upload_id=upload_id,
+                    original_name=original_name,
+                    file_size=file_size,
+                )
+                return Response(
+                    {
+                        "complete": True,
+                        "received_bytes": file_size,
+                        "upload": LogUploadSerializer(row).data,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+            return Response(
+                {
+                    "complete": False,
+                    "chunk_index": chunk_index,
+                    "received_bytes": result["received_bytes"],
+                }
+            )
+        except (TypeError, ValueError) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogScanSerializer(serializers.ModelSerializer):
+    upload_ids = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LogScan
+        fields = (
+            "id",
+            "keyword",
+            "status",
+            "hit_count",
+            "lines_scanned",
+            "files_scanned",
+            "error_message",
+            "started_at",
+            "completed_at",
+            "created_at",
+            "updated_at",
+            "upload_ids",
+        )
+        read_only_fields = fields
+
+    def get_upload_ids(self, obj):
+        return list(obj.uploads.values_list("id", flat=True))
+
+
+class LogScanCreateSerializer(serializers.Serializer):
+    keyword = serializers.CharField(required=False, allow_blank=True, max_length=256)
+    upload_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+        max_length=50,
+    )
+    async_mode = serializers.BooleanField(default=True)
+
+    def validate_upload_ids(self, value):
+        limit = max_files_per_scan()
+        unique = list(dict.fromkeys(value))
+        if len(unique) > limit:
+            raise serializers.ValidationError(
+                f"Select at most {limit} files per scan."
+            )
+        return unique
+
+
+class LogScanHitSerializer(serializers.ModelSerializer):
+    password = serializers.SerializerMethodField()
+    source_file = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LogScanHit
+        fields = (
+            "id",
+            "scan",
+            "url",
+            "domain",
+            "username",
+            "email",
+            "password",
+            "is_kept",
+            "source_file",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_password(self, obj) -> str:
+        # Staff-only Logs Scanner reveals plaintext for analyst triage.
+        return decrypt_secret(obj.password or "")
+
+    def get_source_file(self, obj) -> str:
+        if obj.upload_id and obj.upload:
+            return obj.upload.original_name
+        return ""
+
+
+class LogUploadViewSet(viewsets.ModelViewSet):
+    """List / upload / delete credential dump files. Staff only."""
+
+    permission_classes = [IsStaffUser]
+    serializer_class = LogUploadSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    http_method_names = ["get", "post", "delete", "head", "options"]
+
+    def get_queryset(self):
+        qs = LogUpload.objects.all()
+        user = self.request.user
+        if not user.is_superuser:
+            qs = qs.filter(uploaded_by=user)
+
+        date_from = self.request.query_params.get("date_from") or ""
+        date_to = self.request.query_params.get("date_to") or ""
+        q = (self.request.query_params.get("q") or "").strip()
+        if date_from:
+            parsed = parse_date(date_from)
+            if parsed:
+                qs = qs.filter(created_at__date__gte=parsed)
+        if date_to:
+            parsed = parse_date(date_to)
+            if parsed:
+                qs = qs.filter(created_at__date__lte=parsed)
+        if q:
+            qs = qs.filter(original_name__icontains=q)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        files = request.FILES.getlist("files") or request.FILES.getlist("file")
+        if not files:
+            single = request.FILES.get("file") or request.FILES.get("files")
+            files = [single] if single else []
+        if not files:
+            return Response(
+                {"detail": "No files uploaded. Use multipart field 'files'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        errors = []
+        for uploaded in files:
+            try:
+                row = store_upload_file(uploaded_file=uploaded, user=request.user)
+                created.append(LogUploadSerializer(row).data)
+            except ValueError as exc:
+                errors.append(
+                    {
+                        "name": getattr(uploaded, "name", ""),
+                        "error": str(exc),
+                    }
+                )
+        payload = {
+            "created": created,
+            "errors": errors,
+            "max_upload_bytes": max_upload_bytes(),
+        }
+        code = (
+            status.HTTP_201_CREATED
+            if created
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(payload, status=code)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        delete_upload(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
+    """Create and poll log keyword scans. Staff only."""
+
+    permission_classes = [IsStaffUser]
+    serializer_class = LogScanSerializer
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        qs = LogScan.objects.prefetch_related("uploads").all()
+        user = self.request.user
+        if not user.is_superuser:
+            qs = qs.filter(created_by=user)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        serializer = LogScanCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        upload_ids = data["upload_ids"]
+
+        uploads_qs = LogUpload.objects.filter(id__in=upload_ids)
+        if not request.user.is_superuser:
+            uploads_qs = uploads_qs.filter(uploaded_by=request.user)
+        uploads = list(uploads_qs)
+        if len(uploads) != len(upload_ids):
+            return Response(
+                {"detail": "One or more upload_ids are invalid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        scan = LogScan.objects.create(
+            keyword=(data.get("keyword") or "").strip(),
+            status=LogScan.Status.QUEUED,
+            created_by=request.user,
+        )
+        scan.uploads.set(uploads)
+
+        async_mode = data.get("async_mode", True)
+        if async_mode:
+            run_log_scan_task.delay(scan.id)
+            return Response(
+                LogScanSerializer(scan).data,
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        result = run_log_scan_task.apply(kwargs={"scan_id": scan.id}).get()
+        scan.refresh_from_db()
+        return Response(
+            {**LogScanSerializer(scan).data, "result": result},
+            status=status.HTTP_200_OK,
+        )
+
+    def get_throttles(self):
+        if self.action == "create":
+            from rest_framework.throttling import ScopedRateThrottle
+
+            class CreateThrottle(ScopedRateThrottle):
+                scope = "log_scan_create"
+
+            return [CreateThrottle()]
+        return super().get_throttles()
+
+    @action(detail=True, methods=["get"], url_path="hits")
+    def hits(self, request, pk=None):
+        scan = self.get_object()
+        qs = (
+            LogScanHit.objects.filter(scan=scan)
+            .select_related("upload")
+            .order_by("-id")
+        )
+        kept = request.query_params.get("kept")
+        if kept in {"1", "true", "True"}:
+            qs = qs.filter(is_kept=True)
+        elif kept in {"0", "false", "False"}:
+            qs = qs.filter(is_kept=False)
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            return self.get_paginated_response(LogScanHitSerializer(page, many=True).data)
+        return Response(LogScanHitSerializer(qs, many=True).data)
+
+
+class LogScanHitViewSet(viewsets.GenericViewSet):
+    """Keep / unkeep / list kept credential hits. Staff only."""
+
+    permission_classes = [IsStaffUser]
+    serializer_class = LogScanHitSerializer
+    queryset = LogScanHit.objects.select_related("upload", "scan").all()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser:
+            qs = qs.filter(
+                Q(scan__created_by=user) | Q(kept_by=user) | Q(upload__uploaded_by=user)
+            ).distinct()
+        return qs
+
+    @action(detail=False, methods=["get"], url_path="kept")
+    def kept(self, request):
+        qs = self.get_queryset().filter(is_kept=True).order_by("-updated_at", "-id")
+        if not request.user.is_superuser:
+            qs = qs.filter(kept_by=request.user)
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            return self.get_paginated_response(LogScanHitSerializer(page, many=True).data)
+        return Response(LogScanHitSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="keep")
+    def keep(self, request, pk=None):
+        hit = self.get_object()
+        hit.is_kept = True
+        hit.kept_by = request.user
+        hit.save(update_fields=["is_kept", "kept_by", "updated_at"])
+        return Response(LogScanHitSerializer(hit).data)
+
+    @action(detail=True, methods=["post"], url_path="unkeep")
+    def unkeep(self, request, pk=None):
+        hit = self.get_object()
+        hit.is_kept = False
+        hit.kept_by = None
+        hit.save(update_fields=["is_kept", "kept_by", "updated_at"])
+        return Response(LogScanHitSerializer(hit).data)
+
+    @action(detail=False, methods=["post"], url_path="clear-kept")
+    def clear_kept(self, request):
+        qs = LogScanHit.objects.filter(is_kept=True)
+        if not request.user.is_superuser:
+            qs = qs.filter(kept_by=request.user)
+        updated = qs.update(is_kept=False, kept_by=None)
+        return Response({"cleared": updated})
+
+
+class LogScanLimitsView(APIView):
+    permission_classes = [IsStaffUser]
+
+    def get(self, request):
+        return Response(
+            {
+                "max_upload_bytes": max_upload_bytes(),
+                "max_files_per_scan": max_files_per_scan(),
+                "max_hits": max_hits_per_scan(),
+            }
+        )

@@ -1,0 +1,242 @@
+[
+  {
+    "name": "GitHub",
+    "category": "coding",
+    "url": "https://github.com/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "GitLab",
+    "category": "coding",
+    "url": "https://gitlab.com/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Bitbucket",
+    "category": "coding",
+    "url": "https://bitbucket.org/{}/",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Reddit",
+    "category": "social",
+    "url": "https://www.reddit.com/user/{}/",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "HackerNews",
+    "category": "social",
+    "url": "https://news.ycombinator.com/user?id={}",
+    "method": "GET",
+    "error_type": "message",
+    "error_msg": "No such user"
+  },
+  {
+    "name": "Medium",
+    "category": "social",
+    "url": "https://medium.com/@{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Dev.to",
+    "category": "coding",
+    "url": "https://dev.to/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Keybase",
+    "category": "social",
+    "url": "https://keybase.io/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "About.me",
+    "category": "social",
+    "url": "https://about.me/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Docker Hub",
+    "category": "coding",
+    "url": "https://hub.docker.com/v2/users/{}/",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "npm",
+    "category": "coding",
+    "url": "https://www.npmjs.com/~{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "PyPI",
+    "category": "coding",
+    "url": "https://pypi.org/user/{}/",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Wikipedia",
+    "category": "social",
+    "url": "https://en.wikipedia.org/wiki/User:{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Steam",
+    "category": "gaming",
+    "url": "https://steamcommunity.com/id/{}",
+    "method": "GET",
+    "error_type": "message",
+    "error_msg": "The specified profile could not be found"
+  },
+  {
+    "name": "Twitch",
+    "category": "gaming",
+    "url": "https://www.twitch.tv/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Chess.com",
+    "category": "gaming",
+    "url": "https://www.chess.com/member/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Pastebin",
+    "category": "misc",
+    "url": "https://pastebin.com/u/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Telegram",
+    "category": "social",
+    "url": "https://t.me/{}",
+    "method": "GET",
+    "error_type": "message",
+    "error_msg": "If you have <strong>Telegram</strong>, you can contact"
+  },
+  {
+    "name": "Pinterest",
+    "category": "social",
+    "url": "https://www.pinterest.com/{}/",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Spotify",
+    "category": "misc",
+    "url": "https://open.spotify.com/user/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "SoundCloud",
+    "category": "misc",
+    "url": "https://soundcloud.com/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "SlideShare",
+    "category": "misc",
+    "url": "https://www.slideshare.net/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "TikTok",
+    "category": "social",
+    "url": "https://www.tiktok.com/@{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "TryHackMe",
+    "category": "security",
+    "url": "https://tryhackme.com/p/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "HackTheBox",
+    "category": "security",
+    "url": "https://app.hackthebox.com/profile/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "VirusTotal",
+    "category": "security",
+    "url": "https://www.virustotal.com/gui/user/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Linktree",
+    "category": "social",
+    "url": "https://linktr.ee/{}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Cash App",
+    "category": "finance",
+    "url": "https://cash.app/${}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Roblox",
+    "category": "gaming",
+    "url": "https://www.roblox.com/users/profile?username={}",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  },
+  {
+    "name": "Flickr",
+    "category": "social",
+    "url": "https://www.flickr.com/people/{}/",
+    "method": "GET",
+    "error_type": "status_code",
+    "error_code": 404
+  }
+]

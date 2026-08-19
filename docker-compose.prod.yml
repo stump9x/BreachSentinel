@@ -1,0 +1,18 @@
+# Production overlay — explicit, opt-in. NOT auto-loaded.
+#
+# Because passing any -f flag disables the auto-loaded docker-compose.override.yml,
+# this file gives you a clean, dev-free production run of the built nginx frontend:
+#
+#   Build & run prod:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   Stop:              docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+#
+# Passing -f skips the override, so the base `frontend` (no profile) runs normally;
+# this file just adds a lightweight healthcheck for the built nginx image.
+services:
+  frontend:
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s

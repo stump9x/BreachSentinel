@@ -1,0 +1,182 @@
+[
+  {
+    "name": "bitsight-blog",
+    "url": "https://www.bitsight.com/blog/rss.xml",
+    "category": "news",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "BitSight security blog RSS"
+  },
+  {
+    "name": "socradar-feed",
+    "url": "https://socradar.io/feed/",
+    "category": "breach",
+    "confidence": 2,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — SOCRadar main feed (secondary CTI)"
+  },
+  {
+    "name": "socradar-blog",
+    "url": "https://socradar.io/blog/feed",
+    "category": "news",
+    "confidence": 2,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — SOCRadar blog"
+  },
+  {
+    "name": "group-ib-blog",
+    "url": "https://www.group-ib.com/blog/rss.xml",
+    "category": "news",
+    "confidence": 1,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "Group-IB blog RSS"
+  },
+  {
+    "name": "dehashed-blog",
+    "url": "https://blog.dehashed.com/rss/",
+    "category": "breach",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — DeHashed blog"
+  },
+  {
+    "name": "hibp-bluesky",
+    "url": "https://bsky.app/profile/haveibeenpwned.com/rss",
+    "category": "breach",
+    "confidence": 1,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "Have I Been Pwned Bluesky RSS (official site has no public RSS)"
+  },
+  {
+    "name": "malwarebytes-blog",
+    "url": "https://blog.malwarebytes.com/feed/",
+    "category": "news",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "Malwarebytes blog (already common in Watcher catalog)"
+  },
+  {
+    "name": "databreachtoday",
+    "url": "https://www.databreachtoday.com/rss.xml",
+    "category": "breach",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": true,
+    "notes": "claim/dark-web news — clearnet often 403/429; prefer Tor then clearnet fallback"
+  },
+  {
+    "name": "cybersecurityventures",
+    "url": "https://cybersecurityventures.com/feed/",
+    "category": "news",
+    "confidence": 3,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": true,
+    "notes": "Often blocked on clearnet — prefer Tor then clearnet fallback"
+  },
+  {
+    "name": "darkwebinformer",
+    "url": "https://darkwebinformer.com/rss/",
+    "category": "breach",
+    "confidence": 2,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — Dark Web Informer public RSS (alleged claims / ransomware news)."
+  },
+  {
+    "name": "databreaches-net",
+    "url": "https://www.databreaches.net/feed/",
+    "category": "breach",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — DataBreaches.net (often covers forum claims)."
+  },
+  {
+    "name": "therecord-media",
+    "url": "https://therecord.media/feed",
+    "category": "news",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — The Record (Recorded Future) clearnet RSS."
+  },
+  {
+    "name": "bleepingcomputer",
+    "url": "https://www.bleepingcomputer.com/feed/",
+    "category": "news",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — BleepingComputer (realtime forum/claim coverage)."
+  },
+  {
+    "name": "www-hackread-com",
+    "url": "https://www.hackread.com/feed/",
+    "category": "news",
+    "confidence": 3,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — HackRead (forum/claim reporting)."
+  },
+  {
+    "name": "www-cyberscoop-com",
+    "url": "https://www.cyberscoop.com/feed/",
+    "category": "news",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — CyberScoop."
+  },
+  {
+    "name": "www-securityweek-com",
+    "url": "https://www.securityweek.com/feed/",
+    "category": "news",
+    "confidence": 2,
+    "country": "United States",
+    "country_code": "US",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — SecurityWeek."
+  },
+  {
+    "name": "undercodenews",
+    "url": "https://undercodenews.com/feed/",
+    "category": "breach",
+    "confidence": 3,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — UndercodeNews (dark-web claim reporting)."
+  },
+  {
+    "name": "hendry-adrian",
+    "url": "https://www.hendryadrian.com/feed/",
+    "category": "news",
+    "confidence": 2,
+    "country": "Global",
+    "country_code": "ZZ",
+    "requires_tor": false,
+    "notes": "claim/dark-web news — Cybersecurity News Everyday (may mention forums)."
+  }
+]

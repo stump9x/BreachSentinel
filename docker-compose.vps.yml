@@ -1,0 +1,113 @@
+# VPS deploy overlay — explicit, opt-in (NOT auto-loaded).
+#
+# Goal: run BreachSentinel on a shared VPS WITHOUT touching the app code or
+# structure, and WITHOUT colliding with another app (NewsCrawler on :3000).
+#
+#   Deploy:  docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+#   Stop:    docker compose -f docker-compose.yml -f docker-compose.vps.yml down
+#   Logs:    docker compose -f docker-compose.yml -f docker-compose.vps.yml logs -f
+#
+# Only the frontend UI is published (default :3100, override via FRONTEND_PORT).
+# Every other service talks over the internal Docker network, so their host
+# ports are removed here (!override) to guarantee no clash with NewsCrawler's
+# Postgres/Redis/etc. The frontend nginx reverse-proxies /api to the backend
+# internally, so the backend needs no published port either.
+#
+# Translation: reuse NewsCrawler's existing nc-ollama (qwen2.5:3b) via the
+# external newscrawler_default network — do NOT start a second Ollama.
+services:
+  frontend:
+    ports: !override
+      - "${FRONTEND_PORT:-3100}:80"
+    init: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    ports: !override []
+    init: true
+    stop_grace_period: 30s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - newscrawler_net
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers ${GUNICORN_WORKERS:-2} --timeout ${GUNICORN_TIMEOUT:-1800} --keep-alive 5
+             --max-requests 1000 --max-requests-jitter 100"
+
+  db:
+    ports: !override []
+    shm_size: 256mb
+
+  redis:
+    ports: !override []
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-breachsentinel-redis}
+      --appendonly no
+    volumes:
+      - redis_data:/data
+
+  osint:
+    ports: !override []
+    init: true
+
+  searxng:
+    ports: !override []
+
+  tor:
+    ports: !override []
+
+  celery:
+    init: true
+    stop_grace_period: 45s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - newscrawler_net
+    command: >
+      celery -A config worker -l info
+      --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
+      --max-tasks-per-child=${CELERY_MAX_TASKS_PER_CHILD:-100}
+      --max-memory-per-child=${CELERY_MAX_MEMORY_PER_CHILD_KB:-450000}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10 | grep -q pong",
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+  celery-beat:
+    init: true
+    stop_grace_period: 30s
+    command: >
+      celery -A config beat -l info
+      --schedule=/var/lib/celery/celerybeat-schedule
+    volumes:
+      - celery_beat_data:/var/lib/celery
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  newscrawler_net:
+    external: true
+    name: newscrawler_default
+
+volumes:
+  redis_data:
+  celery_beat_data:

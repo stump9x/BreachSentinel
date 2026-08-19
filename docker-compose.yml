@@ -1,0 +1,229 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bs-postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-breachsentinel}
+      POSTGRES_USER: ${POSTGRES_USER:-breachsentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-db-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-breachsentinel} -d ${POSTGRES_DB:-breachsentinel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: bs-redis
+    restart: unless-stopped
+    logging: *default-logging
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-breachsentinel-redis}
+      --appendonly no
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-breachsentinel-redis}
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: breachsentinel-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bs-backend
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-breachsentinel-redis}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/1
+      OSINT_SERVICE_URL: http://osint:8080
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      TOR_ENABLED: ${TOR_ENABLED:-true}
+      TOR_SOCKS_PROXY: ${TOR_SOCKS_PROXY:-socks5h://tor:9150}
+    volumes:
+      - ./backend:/app
+    ports:
+      # Host :8000 is NewsCrawler; use 8001 for direct BS API (UI still uses :3100 /api proxy)
+      - "127.0.0.1:8001:8000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=3)\"",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 25s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers ${GUNICORN_WORKERS:-1} --timeout ${GUNICORN_TIMEOUT:-1800}"
+
+  celery:
+    image: breachsentinel-backend:latest
+    container_name: bs-celery
+    restart: unless-stopped
+    mem_limit: ${CELERY_MEM_LIMIT:-512m}
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-breachsentinel-redis}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/1
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      TOR_ENABLED: ${TOR_ENABLED:-true}
+      TOR_SOCKS_PROXY: ${TOR_SOCKS_PROXY:-socks5h://tor:9150}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      searxng:
+        condition: service_started
+    command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --max-memory-per-child=300000
+
+  celery-beat:
+    image: breachsentinel-backend:latest
+    container_name: bs-celery-beat
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-breachsentinel-redis}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/1
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      TOR_ENABLED: ${TOR_ENABLED:-true}
+      TOR_SOCKS_PROXY: ${TOR_SOCKS_PROXY:-socks5h://tor:9150}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery:
+        condition: service_started
+    command: celery -A config beat -l info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Empty = same-origin /api via nginx proxy (works in browser)
+        VITE_API_BASE_URL: ""
+    container_name: bs-frontend
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  osint:
+    build:
+      context: ./services/osint
+      dockerfile: Dockerfile
+    container_name: bs-osint
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      OSINT_LISTEN_ADDR: ":8080"
+      OSINT_MAX_CONCURRENCY: ${OSINT_MAX_CONCURRENCY:-50}
+      OSINT_HTTP_TIMEOUT_SEC: ${OSINT_HTTP_TIMEOUT_SEC:-8}
+      OSINT_SITES_PATH: /app/data/sites.json
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Privacy-respecting metasearch (Watcher-aligned data-leak hunting)
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: bs-searxng
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./deploy/searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-searxng-secret-key-for-local-dev-only}
+    ports:
+      - "127.0.0.1:8888:8080"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+  # Tor SOCKS for requires_tor / .onion feeds only; clearnet feeds stay direct.
+  tor:
+    image: heywoodlh/tor-socks-proxy:0.4.9.10
+    container_name: bs-tor
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:9050:9150"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --show-error --fail --max-time 20 --socks5-hostname 127.0.0.1:9150 https://check.torproject.org/api/ip | grep -q '\"IsTor\":true'",
+        ]
+      interval: 60s
+      timeout: 25s
+      retries: 3
+      start_period: 60s
+volumes:
+  postgres_data:
