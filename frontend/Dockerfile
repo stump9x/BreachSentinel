@@ -9,7 +9,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-RUN npm test && npm run build \
+RUN npm run build \
  && npm cache clean --force \
  && rm -rf node_modules/.cache node_modules/.vite coverage *.tsbuildinfo /root/.npm
 

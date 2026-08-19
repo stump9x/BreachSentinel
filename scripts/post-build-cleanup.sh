@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Post-build / post-test cleanup — free disk + reclaim RAM.
-# Run after every `docker compose build` / frontend npm build / pytest.
+# Run after every `docker compose build` / frontend npm build.
 # On this shared VPS also run NewsCrawler's copy when that project built.
 # Usage: sh scripts/post-build-cleanup.sh
 set -eu

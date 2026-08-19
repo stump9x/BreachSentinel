@@ -79,3 +79,5 @@ celerybeat.pid
 *.tmp
 tmp/
 .cache/
+*.dump
+deploy/vps/backups/
