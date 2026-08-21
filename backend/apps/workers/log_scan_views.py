@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils.dateparse import parse_date
 from rest_framework import serializers, status, viewsets
@@ -23,8 +24,9 @@ from apps.workers.log_scanner import (
     store_upload_chunk,
     store_upload_file,
 )
-from apps.workers.models import LogScan, LogScanHit, LogUpload
-from apps.workers.tasks import run_log_scan_task
+from apps.workers.lab_login_verifier import normalize_lab_hostname, normalize_lab_target
+from apps.workers.models import LabAllowlistEntry, LabLoginScan, LogScan, LogScanHit, LogUpload
+from apps.workers.tasks import run_lab_login_scan_task, run_log_scan_task
 
 
 class LogUploadSerializer(serializers.ModelSerializer):
@@ -129,6 +131,70 @@ class LogScanSerializer(serializers.ModelSerializer):
         return list(obj.uploads.values_list("id", flat=True))
 
 
+class LabLoginScanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LabLoginScan
+        fields = (
+            "id",
+            "scan",
+            "target_domain",
+            "target_url",
+            "status",
+            "candidate_count",
+            "attempt_count",
+            "success_count",
+            "result_summary",
+            "error_message",
+            "started_at",
+            "completed_at",
+            "created_by",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class LabAllowlistCreateSerializer(serializers.Serializer):
+    host = serializers.CharField(min_length=1, max_length=255)
+
+
+class LabAllowlistView(APIView):
+    """Read and extend the exact, lab-only hostname allowlist."""
+
+    permission_classes = [IsStaffUser]
+
+    def get(self, request):
+        configured = {
+            item.strip().casefold().rstrip(".")
+            for item in str(getattr(settings, "BRUTEFORCEAI_ALLOWED_HOSTS", "") or "").split(",")
+            if item.strip()
+        }
+        db_hosts = set(
+            LabAllowlistEntry.objects.values_list("host", flat=True)
+        )
+        rows = [
+            {"host": host, "source": "config" if host in configured else "ui"}
+            for host in sorted(configured | db_hosts)
+        ]
+        return Response(rows)
+
+    def post(self, request):
+        serializer = LabAllowlistCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            host = normalize_lab_hostname(serializer.validated_data["host"])
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        entry, created = LabAllowlistEntry.objects.get_or_create(
+            host=host,
+            defaults={"created_by": request.user},
+        )
+        return Response(
+            {"host": entry.host, "source": "ui", "created": created},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
 class LogScanCreateSerializer(serializers.Serializer):
     keyword = serializers.CharField(required=False, allow_blank=True, max_length=256)
     upload_ids = serializers.ListField(
@@ -146,6 +212,20 @@ class LogScanCreateSerializer(serializers.Serializer):
                 f"Select at most {limit} files per scan."
             )
         return unique
+
+
+class LabLoginScanCreateSerializer(serializers.Serializer):
+    target_url = serializers.CharField(min_length=2, max_length=2048)
+    domain = serializers.CharField(min_length=1, max_length=255)
+    hit_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+        max_length=20,
+    )
+
+    def validate_domain(self, value):
+        return value.strip().casefold().rstrip(".")
 
 
 class LogScanHitSerializer(serializers.ModelSerializer):
@@ -301,6 +381,42 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="credential-test")
+    def credential_test(self, request, pk=None):
+        scan = self.get_object()
+        serializer = LabLoginScanCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            target_url, target_domain = normalize_lab_target(data["target_url"])
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        requested_ids = list(dict.fromkeys(data.get("hit_ids") or []))
+        qs = LogScanHit.objects.filter(scan=scan, domain__iexact=data["domain"])
+        if requested_ids:
+            qs = qs.filter(id__in=requested_ids)
+        hits = list(qs.order_by("id")[:20])
+        if not hits:
+            return Response(
+                {"detail": "No credential hits match the selected lab domain."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        job = LabLoginScan.objects.create(
+            scan=scan,
+            target_domain=target_domain,
+            target_url=target_url,
+            hit_ids=[hit.id for hit in hits],
+            candidate_count=len(hits),
+            created_by=request.user,
+        )
+        task = run_lab_login_scan_task.delay(job.id)
+        return Response(
+            {**LabLoginScanSerializer(job).data, "task_id": task.id},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
     def get_throttles(self):
         if self.action == "create":
             from rest_framework.throttling import ScopedRateThrottle
@@ -380,6 +496,22 @@ class LogScanHitViewSet(viewsets.GenericViewSet):
             qs = qs.filter(kept_by=request.user)
         updated = qs.update(is_kept=False, kept_by=None)
         return Response({"cleared": updated})
+
+
+class LabLoginScanViewSet(viewsets.ReadOnlyModelViewSet):
+    """Poll saved lab login verification jobs without exposing passwords."""
+
+    permission_classes = [IsStaffUser]
+    serializer_class = LabLoginScanSerializer
+
+    def get_queryset(self):
+        qs = LabLoginScan.objects.select_related("scan").all()
+        if not self.request.user.is_superuser:
+            qs = qs.filter(created_by=self.request.user)
+        scan_id = self.request.query_params.get("scan")
+        if scan_id:
+            qs = qs.filter(scan_id=scan_id)
+        return qs
 
 
 class LogScanLimitsView(APIView):

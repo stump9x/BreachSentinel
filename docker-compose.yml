@@ -60,6 +60,8 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/1
       OSINT_SERVICE_URL: http://osint:8080
+      BRUTEFORCEAI_SERVICE_URL: http://bruteforceai:8000
+      BRUTEFORCEAI_INTERNAL_TOKEN: ${BRUTEFORCEAI_INTERNAL_TOKEN:-}
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       TOR_ENABLED: ${TOR_ENABLED:-true}
       TOR_SOCKS_PROXY: ${TOR_SOCKS_PROXY:-socks5h://tor:9150}
@@ -85,6 +87,8 @@ services:
         condition: service_healthy
       searxng:
         condition: service_started
+      bruteforceai:
+        condition: service_healthy
     command: >
       sh -c "python manage.py migrate --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000
@@ -105,6 +109,8 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/1
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      BRUTEFORCEAI_SERVICE_URL: http://bruteforceai:8000
+      BRUTEFORCEAI_INTERNAL_TOKEN: ${BRUTEFORCEAI_INTERNAL_TOKEN:-}
       TOR_ENABLED: ${TOR_ENABLED:-true}
       TOR_SOCKS_PROXY: ${TOR_SOCKS_PROXY:-socks5h://tor:9150}
     volumes:
@@ -118,6 +124,8 @@ services:
         condition: service_started
       searxng:
         condition: service_started
+      bruteforceai:
+        condition: service_healthy
     command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --max-memory-per-child=300000
 
   celery-beat:
@@ -146,6 +154,38 @@ services:
       celery:
         condition: service_started
     command: celery -A config beat -l info
+
+  # Isolated, allowlisted lab-only login verification wrapper.
+  bruteforceai:
+    build:
+      context: ./services/bruteforceai
+      dockerfile: Dockerfile
+      args:
+        BRUTEFORCEAI_REF: ${BRUTEFORCEAI_REF:-main}
+    container_name: bs-bruteforceai
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      BRUTEFORCEAI_INTERNAL_TOKEN: ${BRUTEFORCEAI_INTERNAL_TOKEN:-}
+      BRUTEFORCEAI_ALLOWED_HOSTS: ${BRUTEFORCEAI_ALLOWED_HOSTS:-}
+      BRUTEFORCEAI_ALLOW_PUBLIC_TARGETS: ${BRUTEFORCEAI_ALLOW_PUBLIC_TARGETS:-false}
+      BRUTEFORCEAI_MAX_CREDENTIALS: ${BRUTEFORCEAI_MAX_CREDENTIALS:-20}
+      BRUTEFORCEAI_MIN_DELAY_SECONDS: ${BRUTEFORCEAI_MIN_DELAY_SECONDS:-2}
+      BRUTEFORCEAI_JOB_TIMEOUT_SECONDS: ${BRUTEFORCEAI_JOB_TIMEOUT_SECONDS:-900}
+      BRUTEFORCEAI_SPA_SETTLE_SECONDS: ${BRUTEFORCEAI_SPA_SETTLE_SECONDS:-8}
+      BRUTEFORCEAI_DATA_DIR: /data
+    volumes:
+      - bruteforceai_data:/data
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   frontend:
     build:
@@ -227,3 +267,4 @@ services:
       start_period: 60s
 volumes:
   postgres_data:
+  bruteforceai_data:

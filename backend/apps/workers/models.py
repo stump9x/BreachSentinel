@@ -108,3 +108,61 @@ class LogScanHit(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.domain or self.url}:{self.username}"
+
+
+class LabLoginScan(TimeStampedModel):
+    """A guarded, allowlisted login verification job for an uploaded lab dump."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+        NOT_ATTEMPTED = "not_attempted", "Not attempted"
+
+    scan = models.ForeignKey(LogScan, on_delete=models.CASCADE, related_name="lab_login_scans")
+    target_domain = models.CharField(max_length=255, db_index=True)
+    target_url = models.URLField(max_length=2048)
+    hit_ids = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.QUEUED, db_index=True
+    )
+    candidate_count = models.PositiveIntegerField(default=0)
+    attempt_count = models.PositiveIntegerField(default=0)
+    success_count = models.PositiveIntegerField(default=0)
+    result_summary = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lab_login_scans",
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"LabLoginScan#{self.pk} {self.target_domain} ({self.status})"
+
+
+class LabAllowlistEntry(TimeStampedModel):
+    """An exact lab hostname approved from the Logs Scanner UI."""
+
+    host = models.CharField(max_length=255, unique=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lab_allowlist_entries",
+    )
+
+    class Meta:
+        ordering = ["host"]
+
+    def __str__(self) -> str:
+        return self.host

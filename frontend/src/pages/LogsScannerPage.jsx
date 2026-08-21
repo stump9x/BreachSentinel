@@ -147,6 +147,12 @@ export default function LogsScannerPage() {
   const [kept, setKept] = useState([]);
   const [pendingFiles, setPendingFiles] = useState([]);
   const uploadControllerRef = useRef(null);
+  const [labDomain, setLabDomain] = useState("");
+  const [labTargetUrl, setLabTargetUrl] = useState("");
+  const [labJob, setLabJob] = useState(null);
+  const [labBusy, setLabBusy] = useState(false);
+  const [labAllowlist, setLabAllowlist] = useState([]);
+  const [allowlistBusy, setAllowlistBusy] = useState(false);
 
   const loadUploads = useCallback(async () => {
     const data = await api.get(
@@ -179,6 +185,11 @@ export default function LogsScannerPage() {
     }
   }, []);
 
+  const loadLabAllowlist = useCallback(async () => {
+    const data = await api.get("/api/v1/logs/lab-allowlist/");
+    setLabAllowlist(data.results || data || []);
+  }, []);
+
   const loadHits = useCallback(async (scanId) => {
     if (!scanId) {
       setHits([]);
@@ -190,12 +201,104 @@ export default function LogsScannerPage() {
     setHits(data.results || data || []);
   }, []);
 
+  const labDomains = useMemo(() => {
+    const values = new Set();
+    hits.forEach((row) => {
+      const direct = String(row.domain || "").trim().toLowerCase();
+      if (direct) values.add(direct);
+      try {
+        const parsed = new URL(row.url || "");
+        if (parsed.hostname) values.add(parsed.hostname.toLowerCase());
+      } catch {
+        // Keep the parser tolerant of raw log lines.
+      }
+    });
+    return [...values].sort();
+  }, [hits]);
+
+  const labRows = useMemo(
+    () => labJob?.result_summary?.results || [],
+    [labJob]
+  );
+
+  const startLabVerification = async () => {
+    if (!scan?.id || !labDomain.trim()) return;
+    setLabBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const domain = labDomain.trim().toLowerCase().replace(/\.$/, "");
+      const targetUrl = labTargetUrl.trim() || `http://${domain}/`;
+      const matchingHits = hits
+        .filter((row) => {
+          const rowDomain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
+          return rowDomain === domain;
+        })
+        .slice(0, 20);
+      if (!matchingHits.length) {
+        throw new Error("No credential hits match this domain in the current scan.");
+      }
+      const job = await api.post(`/api/v1/logs/scans/${scan.id}/credential-test/`, {
+        domain,
+        target_url: targetUrl,
+        hit_ids: matchingHits.map((row) => row.id),
+      });
+      setLabJob(job);
+      setMessage(`Lab verification queued for ${domain}.`);
+    } catch (err) {
+      setError(err.message || "Failed to start lab verification");
+    } finally {
+      setLabBusy(false);
+    }
+  };
+
+  const addLabAllowlist = async () => {
+    if (!labDomain.trim()) return;
+    setAllowlistBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const entry = await api.post("/api/v1/logs/lab-allowlist/", {
+        host: labDomain.trim(),
+      });
+      await loadLabAllowlist();
+      setMessage(`${entry.host} is now on the lab allowlist.`);
+    } catch (err) {
+      setError(err.message || "Failed to add host to the lab allowlist");
+    } finally {
+      setAllowlistBusy(false);
+    }
+  };
+
+  const labResultColumns = useMemo(
+    () => [
+      { key: "username", label: "Username", truncate: true, maxWidth: 220 },
+      {
+        key: "success",
+        label: "Result",
+        render: (row) => (
+          <Chip
+            size="small"
+            color={row.success ? "success" : "default"}
+            label={row.success ? "Success" : "Not successful"}
+          />
+        ),
+      },
+      {
+        key: "response_time_ms",
+        label: "Response",
+        render: (row) => (row.response_time_ms ? `${row.response_time_ms} ms` : "—"),
+      },
+    ],
+    []
+  );
+
   useEffect(() => {
     if (!isStaff) return undefined;
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([loadUploads(), loadKept(), loadLimits()]);
+        await Promise.all([loadUploads(), loadKept(), loadLimits(), loadLabAllowlist()]);
       } catch (err) {
         if (!cancelled) setError(err.message || "Failed to load");
       }
@@ -203,7 +306,7 @@ export default function LogsScannerPage() {
     return () => {
       cancelled = true;
     };
-  }, [isStaff, loadUploads, loadKept, loadLimits]);
+  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist]);
 
   useEffect(() => {
     if (!scan || !ACTIVE.has(scan.status)) return undefined;
@@ -227,6 +330,28 @@ export default function LogsScannerPage() {
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [scan, loadHits]);
+
+  useEffect(() => {
+    if (!labJob?.id || !ACTIVE.has(labJob.status)) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const latest = await api.get(`/api/v1/logs/credential-tests/${labJob.id}/`);
+        setLabJob(latest);
+        if (!ACTIVE.has(latest.status)) {
+          if (latest.status === "failed" || latest.status === "not_attempted") {
+            setError(latest.error_message || "Lab verification failed");
+          } else {
+            setMessage(
+              `Lab verification finished: ${latest.success_count || 0} successful login(s).`
+            );
+          }
+        }
+      } catch (err) {
+        setError(err.message || "Lab verification poll failed");
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [labJob?.id, labJob?.status]);
 
   const allSelected = uploads.length > 0 && selectedIds.size === uploads.length;
 
@@ -860,6 +985,75 @@ export default function LogsScannerPage() {
           </Box>
         </Paper>
       </Stack>
+
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ md: "center" }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle2">Lab login verification</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Allowlisted lab targets only · max 20 pairs · single-threaded · passwords are not saved in results.
+            </Typography>
+          </Box>
+          <TextField
+            size="small"
+            label="Domain from scan"
+            value={labDomain}
+            onChange={(event) => setLabDomain(event.target.value)}
+            inputProps={{ list: "logs-scanner-lab-domains" }}
+            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
+          />
+          <datalist id="logs-scanner-lab-domains">
+            {labDomains.map((domain) => <option key={domain} value={domain} />)}
+          </datalist>
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={!labDomain.trim() || allowlistBusy || ACTIVE.has(labJob?.status)}
+            onClick={addLabAllowlist}
+          >
+            {allowlistBusy ? <CircularProgress size={18} /> : "Add to allowlist"}
+          </Button>
+          <TextField
+            size="small"
+            label="Lab target URL"
+            placeholder="http://app.test/login"
+            value={labTargetUrl}
+            onChange={(event) => setLabTargetUrl(event.target.value)}
+            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
+          />
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={!scan || ACTIVE.has(scan.status) || !labDomain.trim() || labBusy}
+            onClick={startLabVerification}
+          >
+            {labBusy || ACTIVE.has(labJob?.status) ? <CircularProgress size={18} color="inherit" /> : "Verify in lab"}
+          </Button>
+        </Stack>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1.25 }} alignItems="center">
+          <Typography variant="caption" color="text.secondary">Lab allowlist:</Typography>
+          {labAllowlist.length ? labAllowlist.map((entry) => (
+            <Chip
+              key={entry.host}
+              size="small"
+              variant={entry.host === labDomain.trim().toLowerCase().replace(/\.$/, "") ? "filled" : "outlined"}
+              color={entry.source === "config" ? "default" : "info"}
+              label={entry.host}
+              onClick={() => setLabDomain(entry.host)}
+            />
+          )) : (
+            <Typography variant="caption" color="text.secondary">No lab hosts added yet.</Typography>
+          )}
+        </Stack>
+        {labJob ? (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              Job #{labJob.id} · {labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
+            </Typography>
+            <DataTable columns={labResultColumns} rows={labRows} empty="No result rows yet" />
+          </Box>
+        ) : null}
+      </Paper>
 
       <Stack direction={{ xs: "column", lg: "row" }} spacing={2} alignItems="stretch">
         <Paper variant="outlined" sx={{ p: 2, flex: 1.4, minHeight: 280 }}>

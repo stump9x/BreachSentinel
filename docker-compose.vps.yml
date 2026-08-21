@@ -103,6 +103,10 @@ services:
       timeout: 5s
       retries: 3
 
+  bruteforceai:
+    init: true
+    stop_grace_period: 30s
+
 networks:
   newscrawler_net:
     external: true

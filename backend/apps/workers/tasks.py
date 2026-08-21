@@ -167,6 +167,14 @@ def run_log_scan_task(self, scan_id: int) -> dict:
         raise self.retry(exc=exc, countdown=15) from exc
 
 
+@shared_task(name="workers.run_lab_login_scan")
+def run_lab_login_scan_task(job_id: int) -> dict:
+    """Run one guarded Logs Scanner → BruteForceAI lab verification job."""
+    from apps.workers.lab_login_verifier import run_lab_login_scan
+
+    return run_lab_login_scan(job_id)
+
+
 @shared_task(name="workers.ingest_all_feeds")
 def ingest_all_feeds(limit: int = 30) -> dict:
     """Fan-out helper used by beat and manual API triggers."""

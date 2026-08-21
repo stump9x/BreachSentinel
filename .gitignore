@@ -81,3 +81,7 @@ tmp/
 .cache/
 *.dump
 deploy/vps/backups/
+_vps_extract/
+_vps_stage/
+_vps_sync.tar.gz
+tmp-codex-upload/

@@ -26,6 +26,7 @@ changes appear instantly without rebuilding any image.
 # Dev (default): frontend hot-reload on :3000, backend + source bind-mounted
 docker compose up -d
 docker compose logs -f frontend-dev            # dev server logs
+docker compose exec frontend-dev npx vitest run # frontend tests
 
 # Prod: build the real nginx frontend (passing -f skips the dev override)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build

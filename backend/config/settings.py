@@ -511,6 +511,14 @@ GITHUB_SCAN_STALE_MINUTES = env.int("GITHUB_SCAN_STALE_MINUTES", default=20)
 # Cap below GitHub's practical search budget to reduce rate-limit hits.
 GITHUB_SCAN_MAX_RESULTS = env.int("GITHUB_SCAN_MAX_RESULTS", default=1500)
 
+# Lab-only login verification service. The service fails closed unless both
+# BRUTEFORCEAI_INTERNAL_TOKEN and an allowlisted lab host are configured.
+BRUTEFORCEAI_SERVICE_URL = env("BRUTEFORCEAI_SERVICE_URL", default="http://bruteforceai:8000")
+BRUTEFORCEAI_INTERNAL_TOKEN = env("BRUTEFORCEAI_INTERNAL_TOKEN", default="")
+BRUTEFORCEAI_ALLOWED_HOSTS = env("BRUTEFORCEAI_ALLOWED_HOSTS", default="")
+BRUTEFORCEAI_ALLOW_PUBLIC_TARGETS = env.bool("BRUTEFORCEAI_ALLOW_PUBLIC_TARGETS", default=False)
+BRUTEFORCEAI_MAX_CREDENTIALS = env.int("BRUTEFORCEAI_MAX_CREDENTIALS", default=20)
+
 # Zone-H / defacement archive → The Wire.
 # Default provider=haxor (haxor.id) bypasses zone-h.org captcha from cloud IPs.
 # For zone-h.org directly: ZONEH_PROVIDER=zoneh + PHPSESSID + ZHE cookies

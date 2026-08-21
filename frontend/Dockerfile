@@ -9,6 +9,8 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+# The repository currently has no test files; keep the build usable while
+# preserving the test script for local/CI runs when tests are added.
 RUN npm run build \
  && npm cache clean --force \
  && rm -rf node_modules/.cache node_modules/.vite coverage *.tsbuildinfo /root/.npm
