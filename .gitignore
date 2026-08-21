@@ -79,9 +79,12 @@ celerybeat.pid
 *.tmp
 tmp/
 .cache/
+
+# Local sync artifacts
 *.dump
 deploy/vps/backups/
 _vps_extract/
 _vps_stage/
-_vps_sync.tar.gz
+vps.tar.gz
 tmp-codex-upload/
+

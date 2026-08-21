@@ -1,0 +1,128 @@
+diff --git a/BruteForceCore.py b/BruteForceCore.py
+index f399c3d..ae07a7a 100644
+--- a/BruteForceCore.py
++++ b/BruteForceCore.py
+@@ -1941,90 +1941,55 @@ Return ONLY valid JSON format:
+                     # Navigate to URL
+                     page.goto(url, timeout=30000)
+                     page.wait_for_load_state('networkidle')
++
++                    # BreachSentinel keeps the upstream attack flow and replaces
++                    # only the SPA result decision with independent browser signals.
++                    from bs_multisignal_detector import capture_page_snapshot, wait_for_spa_result
++
++                    username_selector = selectors_data.get('login_username_selector')
++                    password_selector = selectors_data.get('login_password_selector')
++                    submit_selector = selectors_data.get('login_submit_button_selector')
++                    before_login = capture_page_snapshot(
++                        page, username_selector, password_selector
++                    )
+                     
+                     # Fill username field
+-                    username_selector = selectors_data.get('login_username_selector')
+                     if username_selector:
+                         page.locator(username_selector).first.clear()
+                         page.locator(username_selector).first.fill(username)
+                     
+                     # Fill password field
+-                    password_selector = selectors_data.get('login_password_selector')
+                     if password_selector:
+                         page.locator(password_selector).first.clear()
+                         page.locator(password_selector).first.fill(password)
+                     
+                     # Click submit button
+-                    submit_selector = selectors_data.get('login_submit_button_selector')
+                     if submit_selector:
+                         page.locator(submit_selector).first.click()
+                     
+-                    # Wait for response
+-                    try:
+-                        page.wait_for_load_state('networkidle', timeout=5000)
+-                    except:
+-                        time.sleep(2)  # Fallback wait
+-                    
+-                    # Add browser wait if configured
+-                    if self.show_browser and self.browser_wait > 0:
+-                        time.sleep(self.browser_wait)
+-                    
+-                    # Clear form fields to get clean DOM measurement
+-                    try:
+-                        if username_selector:
+-                            page.locator(username_selector).first.clear()
+-                        if password_selector:
+-                            page.locator(password_selector).first.clear()
+-                    except:
+-                        pass  # Ignore if fields can't be cleared
+-                    
+-                    # Get current DOM length
+-                    current_html = page.content()
+-                    current_dom_length = len(current_html)
+-                    
+-                    # Get expected failed DOM length from database
++                    # Wait longer for SPA state and combine URL, form visibility,
++                    # auth storage, success/failure text, and DOM/text hashes.
+                     expected_failed_dom_length = selectors_data.get('failed_dom_length')
+-                    
+-                    # Determine success/failure
+-                    success = False
+-                    if expected_failed_dom_length:
+-                        expected_failed_dom_length = int(expected_failed_dom_length)
+-                        
+-                        # Calculate DOM length difference
+-                        dom_diff = abs(current_dom_length - expected_failed_dom_length)
+-                        
+-                        # Use threshold-based detection
+-                        if dom_diff < self.dom_threshold:
+-                            # DOM is close to failed attempt - login failed
+-                            success = False
+-                            if self.debug:
+-                                print(f"   🔍 DEBUG - DOM close to failed length (diff: {dom_diff} < {self.dom_threshold}) - LOGIN FAILED")
+-                        else:
+-                            # DOM significantly different from failed attempt - login likely succeeded
+-                            success = True
+-                            if self.debug:
+-                                print(f"   🔍 DEBUG - DOM differs significantly from failed length (diff: {dom_diff} >= {self.dom_threshold}) - LOGIN SUCCESS")
+-                    else:
+-                        # No reference failed DOM length - use heuristics
+-                        print(f"   ⚠️  No reference failed DOM length - using heuristics")
+-                        
+-                        # Look for common success/failure indicators
+-                        page_text = page.content().lower()
+-                        
+-                        # Success indicators
+-                        success_indicators = ['dashboard', 'welcome', 'logout', 'profile', 'account', 'home']
+-                        failure_indicators = ['error', 'invalid', 'incorrect', 'failed', 'wrong', 'denied']
+-                        
+-                        success_score = sum(1 for indicator in success_indicators if indicator in page_text)
+-                        failure_score = sum(1 for indicator in failure_indicators if indicator in page_text)
+-                        
+-                        if success_score > failure_score:
+-                            success = True
+-                        else:
+-                            success = False
+-                        
+-                        if self.debug:
+-                            print(f"   🔍 DEBUG - Heuristic scores: success={success_score}, failure={failure_score}")
++                    detection = wait_for_spa_result(
++                        page,
++                        before_login,
++                        username_selector,
++                        password_selector,
++                        expected_failed_dom_length,
++                        self.dom_threshold,
++                    )
++                    current_dom_length = detection.current_dom_length
++                    success = detection.success
++                    enabled_signals = [
++                        name for name, enabled in detection.signals.items() if enabled
++                    ]
++                    print(
++                        "   🧭 BreachSentinel multi-signal detector: "
++                        f"success={success} score={detection.score} "
++                        f"signals={','.join(enabled_signals)} "
++                        f"url={detection.safe_before_url}->{detection.safe_after_url} "
++                        f"failed_dom_difference={detection.failed_dom_difference}"
++                    )
+                     
+                     # Calculate response time
+                     response_time_ms = int((time.time() - start_time) * 1000)

@@ -1,9 +1,11 @@
 """Playwright smoke test against a local synthetic SPA login form."""
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import sys
 import threading
 
-from bs_multisignal_detector import _attempt_login_multisignal
+sys.path.insert(0, "/opt/BruteForceAI")
+from BruteForceCore import BruteForceAI
 
 
 HTML = b"""<!doctype html><html><body>
@@ -74,13 +76,13 @@ selectors = {
 
 try:
     failed = FakeBruteForceAI()
-    assert _attempt_login_multisignal(
+    assert BruteForceAI._attempt_login(
         failed, url, selectors, "lab@example.test", "wrong-pass"
     ) is False
     assert failed.attempts[-1]["success"] is False
 
     succeeded = FakeBruteForceAI()
-    assert _attempt_login_multisignal(
+    assert BruteForceAI._attempt_login(
         succeeded, url, selectors, "lab@example.test", "correct-pass"
     ) is True
     assert succeeded.attempts[-1]["success"] is True

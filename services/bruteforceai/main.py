@@ -29,7 +29,6 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("bruteforceai-wrapper")
 
 REPO = Path(os.getenv("BRUTEFORCEAI_REPO", "/opt/BruteForceAI"))
-PATCHED_RUNNER = Path(os.getenv("BRUTEFORCEAI_RUNNER", "/app/patched_runner.py"))
 DATA_DIR = Path(os.getenv("BRUTEFORCEAI_DATA_DIR", "/data"))
 DATABASE = DATA_DIR / "bruteforce.db"
 INTERNAL_TOKEN = os.getenv("BRUTEFORCEAI_INTERNAL_TOKEN", "").strip()
@@ -393,7 +392,7 @@ def _fallback_browser_analysis(target_url: str) -> dict | None:
 def _run_scan(request: ScanRequest, target_url: str) -> dict:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     results: list[dict] = []
-    command_path = PATCHED_RUNNER if PATCHED_RUNNER.is_file() else REPO / "BruteForceAI.py"
+    command_path = REPO / "BruteForceAI.py"
     if not command_path.is_file():
         return {"status": "failed", "error": "BruteForceAI source is unavailable", "results": []}
 
