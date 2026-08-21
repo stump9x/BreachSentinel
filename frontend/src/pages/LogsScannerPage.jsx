@@ -18,6 +18,8 @@ import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { api, buildQuery } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DataTable } from "../components/DataTable";
@@ -45,6 +47,15 @@ function formatDate(iso) {
   if (!iso) return "—";
   try {
     return new Date(iso).toISOString().slice(0, 10);
+  } catch {
+    return "—";
+  }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString();
   } catch {
     return "—";
   }
@@ -153,6 +164,9 @@ export default function LogsScannerPage() {
   const [labBusy, setLabBusy] = useState(false);
   const [labAllowlist, setLabAllowlist] = useState([]);
   const [allowlistBusy, setAllowlistBusy] = useState(false);
+  const [labHistory, setLabHistory] = useState([]);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [showHiddenHistory, setShowHiddenHistory] = useState(false);
 
   const loadUploads = useCallback(async () => {
     const data = await api.get(
@@ -190,6 +204,13 @@ export default function LogsScannerPage() {
     setLabAllowlist(data.results || data || []);
   }, []);
 
+  const loadLabHistory = useCallback(async () => {
+    const data = await api.get(
+      `/api/v1/logs/credential-tests/${buildQuery({ page_size: 100, include_hidden: true })}`
+    );
+    setLabHistory(data.results || data || []);
+  }, []);
+
   const loadHits = useCallback(async (scanId) => {
     if (!scanId) {
       setHits([]);
@@ -217,8 +238,22 @@ export default function LogsScannerPage() {
   }, [hits]);
 
   const labRows = useMemo(
-    () => labJob?.result_summary?.results || [],
+    () => (labJob?.result_summary?.results || []).map((row, index) => ({
+      ...row,
+      id: `${labJob.id}-${index}`,
+      target_url: labJob.target_url,
+    })),
     [labJob]
+  );
+
+  const visibleLabHistory = useMemo(
+    () => labHistory.filter((row) => showHiddenHistory || !row.is_hidden),
+    [labHistory, showHiddenHistory]
+  );
+
+  const hiddenHistoryCount = useMemo(
+    () => labHistory.filter((row) => row.is_hidden).length,
+    [labHistory]
   );
 
   const startLabVerification = async () => {
@@ -244,6 +279,7 @@ export default function LogsScannerPage() {
         hit_ids: matchingHits.map((row) => row.id),
       });
       setLabJob(job);
+      await loadLabHistory();
       setMessage(`Lab verification queued for ${domain}.`);
     } catch (err) {
       setError(err.message || "Failed to start lab verification");
@@ -270,8 +306,87 @@ export default function LogsScannerPage() {
     }
   };
 
+  const removeLabAllowlist = async (entry) => {
+    if (entry.source !== "ui") return;
+    if (!window.confirm(`Remove ${entry.host} from the lab allowlist?`)) return;
+    setAllowlistBusy(true);
+    setError("");
+    try {
+      await api.delete(
+        `/api/v1/logs/lab-allowlist/${buildQuery({ host: entry.host })}`
+      );
+      await loadLabAllowlist();
+      setMessage(`${entry.host} was removed from the lab allowlist.`);
+    } catch (err) {
+      setError(err.message || "Failed to remove host from the lab allowlist");
+    } finally {
+      setAllowlistBusy(false);
+    }
+  };
+
+  const setLabHistoryVisibility = async (row, isHidden) => {
+    setHistoryBusy(true);
+    setError("");
+    try {
+      const updated = await api.patch(
+        `/api/v1/logs/credential-tests/${row.id}/visibility/`,
+        { is_hidden: isHidden }
+      );
+      setLabHistory((current) => current.map((item) => (
+        item.id === updated.id ? updated : item
+      )));
+      if (labJob?.id === updated.id) setLabJob(updated);
+      setMessage(isHidden ? "Login history entry hidden." : "Login history entry restored.");
+    } catch (err) {
+      setError(err.message || "Failed to update login history visibility");
+    } finally {
+      setHistoryBusy(false);
+    }
+  };
+
+  const deleteLabHistory = async (row) => {
+    if (ACTIVE.has(row.status)) return;
+    if (!window.confirm(`Delete login history job #${row.id}?`)) return;
+    setHistoryBusy(true);
+    setError("");
+    try {
+      await api.delete(`/api/v1/logs/credential-tests/${row.id}/`);
+      setLabHistory((current) => current.filter((item) => item.id !== row.id));
+      if (labJob?.id === row.id) setLabJob(null);
+      setMessage(`Login history job #${row.id} was deleted.`);
+    } catch (err) {
+      setError(err.message || "Failed to delete login history");
+    } finally {
+      setHistoryBusy(false);
+    }
+  };
+
+  const clearLabHistory = async () => {
+    const deletable = labHistory.filter((row) => !ACTIVE.has(row.status));
+    if (!deletable.length) return;
+    if (!window.confirm(`Delete ${deletable.length} completed login history item(s)?`)) return;
+    setHistoryBusy(true);
+    setError("");
+    try {
+      const result = await api.delete("/api/v1/logs/credential-tests/clear/");
+      await loadLabHistory();
+      if (labJob && !ACTIVE.has(labJob.status)) setLabJob(null);
+      setMessage(`${result?.deleted || 0} login history item(s) deleted.`);
+    } catch (err) {
+      setError(err.message || "Failed to clear login history");
+    } finally {
+      setHistoryBusy(false);
+    }
+  };
+
   const labResultColumns = useMemo(
     () => [
+      {
+        key: "target_url",
+        label: "URL",
+        nowrap: false,
+        sx: { overflowWrap: "anywhere" },
+      },
       { key: "username", label: "Username", truncate: true, maxWidth: 220 },
       {
         key: "success",
@@ -293,12 +408,100 @@ export default function LogsScannerPage() {
     []
   );
 
+  const labHistoryColumns = [
+    {
+      key: "created_at",
+      label: "Time",
+      nowrap: true,
+      render: (row) => formatDateTime(row.created_at),
+    },
+    {
+      key: "target_url",
+      label: "URL",
+      nowrap: false,
+      sx: { overflowWrap: "anywhere" },
+      render: (row) => row.target_url || row.target_domain || "—",
+    },
+    {
+      key: "usernames",
+      label: "Username(s)",
+      nowrap: false,
+      render: (row) => {
+        const usernames = [...new Set(
+          (row.result_summary?.results || [])
+            .map((item) => String(item.username || "").trim())
+            .filter(Boolean)
+        )];
+        return usernames.join(", ") || "—";
+      },
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <Chip
+          size="small"
+          color={row.success_count ? "success" : ACTIVE.has(row.status) ? "warning" : "default"}
+          label={`${row.status} · ${row.attempt_count || 0}/${row.success_count || 0}`}
+        />
+      ),
+    },
+    {
+      key: "visibility",
+      label: "Visibility",
+      render: (row) => (
+        <Chip
+          size="small"
+          variant="outlined"
+          label={row.is_hidden ? "Hidden" : "Visible"}
+        />
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      width: 92,
+      sticky: "right",
+      render: (row) => (
+        <Stack direction="row" spacing={0.25}>
+          <IconButton
+            size="small"
+            disabled={historyBusy}
+            title={row.is_hidden ? "Unhide history" : "Hide history"}
+            onClick={() => setLabHistoryVisibility(row, !row.is_hidden)}
+          >
+            {row.is_hidden ? (
+              <VisibilityOutlinedIcon fontSize="small" />
+            ) : (
+              <VisibilityOffOutlinedIcon fontSize="small" />
+            )}
+          </IconButton>
+          <IconButton
+            size="small"
+            color="error"
+            disabled={historyBusy || ACTIVE.has(row.status)}
+            title={ACTIVE.has(row.status) ? "Active jobs cannot be deleted" : "Delete history"}
+            onClick={() => deleteLabHistory(row)}
+          >
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      ),
+    },
+  ];
+
   useEffect(() => {
     if (!isStaff) return undefined;
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([loadUploads(), loadKept(), loadLimits(), loadLabAllowlist()]);
+        await Promise.all([
+          loadUploads(),
+          loadKept(),
+          loadLimits(),
+          loadLabAllowlist(),
+          loadLabHistory(),
+        ]);
       } catch (err) {
         if (!cancelled) setError(err.message || "Failed to load");
       }
@@ -306,7 +509,7 @@ export default function LogsScannerPage() {
     return () => {
       cancelled = true;
     };
-  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist]);
+  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist, loadLabHistory]);
 
   useEffect(() => {
     if (!scan || !ACTIVE.has(scan.status)) return undefined;
@@ -338,6 +541,7 @@ export default function LogsScannerPage() {
         const latest = await api.get(`/api/v1/logs/credential-tests/${labJob.id}/`);
         setLabJob(latest);
         if (!ACTIVE.has(latest.status)) {
+          await loadLabHistory();
           if (latest.status === "failed" || latest.status === "not_attempted") {
             setError(latest.error_message || "Lab verification failed");
           } else {
@@ -351,7 +555,7 @@ export default function LogsScannerPage() {
       }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [labJob?.id, labJob?.status]);
+  }, [labJob?.id, labJob?.status, loadLabHistory]);
 
   const allSelected = uploads.length > 0 && selectedIds.size === uploads.length;
 
@@ -1040,6 +1244,9 @@ export default function LogsScannerPage() {
               color={entry.source === "config" ? "default" : "info"}
               label={entry.host}
               onClick={() => setLabDomain(entry.host)}
+              onDelete={entry.source === "ui" ? () => removeLabAllowlist(entry) : undefined}
+              deleteIcon={entry.source === "ui" ? <CloseIcon /> : undefined}
+              disabled={allowlistBusy}
             />
           )) : (
             <Typography variant="caption" color="text.secondary">No lab hosts added yet.</Typography>
@@ -1048,11 +1255,51 @@ export default function LogsScannerPage() {
         {labJob ? (
           <Box sx={{ mt: 1.5 }}>
             <Typography variant="caption" color="text.secondary">
-              Job #{labJob.id} · {labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
+              Job #{labJob.id} · {labJob.target_url} · {labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
             </Typography>
             <DataTable columns={labResultColumns} rows={labRows} empty="No result rows yet" />
           </Box>
         ) : null}
+        <Box sx={{ mt: 2 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            justifyContent="space-between"
+            alignItems={{ sm: "center" }}
+            sx={{ mb: 1 }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="subtitle2">Login attempt history</Typography>
+              <Chip size="small" label={String(visibleLabHistory.length)} />
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={showHiddenHistory ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
+                disabled={!hiddenHistoryCount || historyBusy}
+                onClick={() => setShowHiddenHistory((current) => !current)}
+              >
+                {showHiddenHistory ? "Hide hidden" : `Show hidden (${hiddenHistoryCount})`}
+              </Button>
+              <Button
+                size="small"
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                disabled={historyBusy || !labHistory.some((row) => !ACTIVE.has(row.status))}
+                onClick={clearLabHistory}
+              >
+                Clear history
+              </Button>
+            </Stack>
+          </Stack>
+          <DataTable
+            columns={labHistoryColumns}
+            rows={visibleLabHistory}
+            loading={historyBusy && !labHistory.length}
+            empty={showHiddenHistory ? "No login history yet" : "No visible login history"}
+          />
+        </Box>
       </Paper>
 
       <Stack direction={{ xs: "column", lg: "row" }} spacing={2} alignItems="stretch">

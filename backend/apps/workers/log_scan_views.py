@@ -144,6 +144,7 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
             "attempt_count",
             "success_count",
             "result_summary",
+            "is_hidden",
             "error_message",
             "started_at",
             "completed_at",
@@ -156,6 +157,10 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
 
 class LabAllowlistCreateSerializer(serializers.Serializer):
     host = serializers.CharField(min_length=1, max_length=255)
+
+
+class LabLoginVisibilitySerializer(serializers.Serializer):
+    is_hidden = serializers.BooleanField()
 
 
 class LabAllowlistView(APIView):
@@ -193,6 +198,29 @@ class LabAllowlistView(APIView):
             {"host": entry.host, "source": "ui", "created": created},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+    def delete(self, request):
+        raw_host = request.query_params.get("host", "")
+        try:
+            host = normalize_lab_hostname(raw_host)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        configured = {
+            item.strip().casefold().rstrip(".")
+            for item in str(getattr(settings, "BRUTEFORCEAI_ALLOWED_HOSTS", "") or "").split(",")
+            if item.strip()
+        }
+        if host in configured:
+            return Response(
+                {"detail": "Hosts configured through environment settings cannot be removed here."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        deleted, _ = LabAllowlistEntry.objects.filter(host=host).delete()
+        if not deleted:
+            return Response({"detail": "Allowlist entry was not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class LogScanCreateSerializer(serializers.Serializer):
@@ -504,14 +532,49 @@ class LabLoginScanViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsStaffUser]
     serializer_class = LabLoginScanSerializer
 
-    def get_queryset(self):
+    def _owned_queryset(self):
         qs = LabLoginScan.objects.select_related("scan").all()
         if not self.request.user.is_superuser:
             qs = qs.filter(created_by=self.request.user)
+        return qs
+
+    def get_queryset(self):
+        qs = self._owned_queryset()
         scan_id = self.request.query_params.get("scan")
         if scan_id:
             qs = qs.filter(scan_id=scan_id)
+        include_hidden = str(self.request.query_params.get("include_hidden", "")).casefold()
+        if self.action == "list" and include_hidden not in {"1", "true", "yes"}:
+            qs = qs.filter(is_hidden=False)
         return qs
+
+    @action(detail=True, methods=["patch"], url_path="visibility")
+    def visibility(self, request, pk=None):
+        serializer = LabLoginVisibilitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = self.get_object()
+        job.is_hidden = serializer.validated_data["is_hidden"]
+        job.save(update_fields=["is_hidden", "updated_at"])
+        return Response(LabLoginScanSerializer(job).data)
+
+    def destroy(self, request, *args, **kwargs):
+        job = self.get_object()
+        if job.status in {LabLoginScan.Status.QUEUED, LabLoginScan.Status.RUNNING}:
+            return Response(
+                {"detail": "An active login verification cannot be deleted."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        job.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["delete"], url_path="clear")
+    def clear_history(self, request):
+        qs = self._owned_queryset().exclude(
+            status__in=[LabLoginScan.Status.QUEUED, LabLoginScan.Status.RUNNING]
+        )
+        count = qs.count()
+        qs.delete()
+        return Response({"deleted": count})
 
 
 class LogScanLimitsView(APIView):

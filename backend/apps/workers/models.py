@@ -131,6 +131,7 @@ class LabLoginScan(TimeStampedModel):
     attempt_count = models.PositiveIntegerField(default=0)
     success_count = models.PositiveIntegerField(default=0)
     result_summary = models.JSONField(default=dict, blank=True)
+    is_hidden = models.BooleanField(default=False, db_index=True)
     error_message = models.TextField(blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)

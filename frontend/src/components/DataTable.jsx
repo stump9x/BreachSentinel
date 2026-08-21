@@ -65,6 +65,10 @@ export function DataTable({ columns, rows, loading, empty = "No records" }) {
     };
   }
 
+  function columnId(col) {
+    return col.id ?? col.key;
+  }
+
   const useFixedLayout = columns.some((col) => col.sticky || col.width);
 
   return (
@@ -88,7 +92,7 @@ export function DataTable({ columns, rows, loading, empty = "No records" }) {
         <TableHead>
           <TableRow>
             {columns.map((col) => (
-              <TableCell key={col.id} align={col.align} sx={cellSx(col, true)}>
+              <TableCell key={columnId(col)} align={col.align} sx={cellSx(col, true)}>
                 {col.label}
               </TableCell>
             ))}
@@ -98,8 +102,8 @@ export function DataTable({ columns, rows, loading, empty = "No records" }) {
           {rows.map((row, idx) => (
             <TableRow key={row.id ?? idx} hover>
               {columns.map((col) => (
-                <TableCell key={col.id} align={col.align} sx={cellSx(col)}>
-                  {col.render ? col.render(row) : row[col.id]}
+                <TableCell key={columnId(col)} align={col.align} sx={cellSx(col)}>
+                  {col.render ? col.render(row) : row[columnId(col)]}
                 </TableCell>
               ))}
             </TableRow>
