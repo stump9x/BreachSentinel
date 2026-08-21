@@ -80,6 +80,31 @@ def normalize_lab_target(value: str) -> tuple[str, str]:
     return raw, host
 
 
+def normalize_lab_proxy(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    parsed = urlsplit(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Proxy must be an HTTP(S) URL.")
+    if parsed.username or parsed.password:
+        raise ValueError("Proxy credentials may not be embedded in the URL.")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("Proxy must contain only scheme, host, and optional port.")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise ValueError("Proxy URL contains an invalid port.") from exc
+    return f"{parsed.scheme}://{parsed.netloc.rstrip('/')}"
+
+
+def _safe_external_ip(value) -> str:
+    try:
+        return str(ipaddress.ip_address(str(value or "").strip()))
+    except ValueError:
+        return ""
+
+
 def run_lab_login_scan(job_id: int) -> dict:
     job = LabLoginScan.objects.select_related("scan").get(pk=job_id)
     with transaction.atomic():
@@ -121,6 +146,7 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "target_url": job.target_url,
                 "credentials": credentials,
                 "allowed_hosts": sorted(get_lab_allowlisted_hosts()),
+                "proxy_url": job.proxy_url or None,
             },
             headers={"X-BruteForceAI-Token": token},
             timeout=1800.0,
@@ -133,6 +159,8 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "success": bool(item.get("success")),
                 "response_time_ms": item.get("response_time_ms"),
                 "timestamp": item.get("timestamp"),
+                "external_ip": _safe_external_ip(item.get("external_ip")),
+                "proxy_server": job.proxy_url or "",
             }
             for item in payload.get("results") or []
             if isinstance(item, dict)
@@ -142,6 +170,7 @@ def run_lab_login_scan(job_id: int) -> dict:
         service_status = str(payload.get("status") or "failed")
         job.result_summary = {
             "target_domain": job.target_domain,
+            "proxy_url": job.proxy_url or "",
             "service_status": service_status,
             "reason_code": str(payload.get("reason_code") or ""),
             "analysis": payload.get("analysis") or {},

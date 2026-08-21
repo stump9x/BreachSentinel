@@ -24,7 +24,11 @@ from apps.workers.log_scanner import (
     store_upload_chunk,
     store_upload_file,
 )
-from apps.workers.lab_login_verifier import normalize_lab_hostname, normalize_lab_target
+from apps.workers.lab_login_verifier import (
+    normalize_lab_hostname,
+    normalize_lab_proxy,
+    normalize_lab_target,
+)
 from apps.workers.models import LabAllowlistEntry, LabLoginScan, LogScan, LogScanHit, LogUpload
 from apps.workers.tasks import run_lab_login_scan_task, run_log_scan_task
 
@@ -139,6 +143,7 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
             "scan",
             "target_domain",
             "target_url",
+            "proxy_url",
             "status",
             "candidate_count",
             "attempt_count",
@@ -245,6 +250,7 @@ class LogScanCreateSerializer(serializers.Serializer):
 class LabLoginScanCreateSerializer(serializers.Serializer):
     target_url = serializers.CharField(min_length=2, max_length=2048)
     domain = serializers.CharField(min_length=1, max_length=255)
+    proxy_url = serializers.CharField(required=False, allow_blank=True, max_length=2048)
     hit_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
@@ -254,6 +260,12 @@ class LabLoginScanCreateSerializer(serializers.Serializer):
 
     def validate_domain(self, value):
         return value.strip().casefold().rstrip(".")
+
+    def validate_proxy_url(self, value):
+        try:
+            return normalize_lab_proxy(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
 
 class LogScanHitSerializer(serializers.ModelSerializer):
@@ -435,6 +447,7 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             scan=scan,
             target_domain=target_domain,
             target_url=target_url,
+            proxy_url=data.get("proxy_url", ""),
             hit_ids=[hit.id for hit in hits],
             candidate_count=len(hits),
             created_by=request.user,

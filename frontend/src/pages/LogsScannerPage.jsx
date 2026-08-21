@@ -18,6 +18,8 @@ import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { api, buildQuery } from "../api/client";
@@ -160,6 +162,7 @@ export default function LogsScannerPage() {
   const uploadControllerRef = useRef(null);
   const [labDomain, setLabDomain] = useState("");
   const [labTargetUrl, setLabTargetUrl] = useState("");
+  const [labProxyUrl, setLabProxyUrl] = useState("");
   const [labJob, setLabJob] = useState(null);
   const [labBusy, setLabBusy] = useState(false);
   const [labAllowlist, setLabAllowlist] = useState([]);
@@ -167,6 +170,7 @@ export default function LogsScannerPage() {
   const [labHistory, setLabHistory] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [showHiddenHistory, setShowHiddenHistory] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
 
   const loadUploads = useCallback(async () => {
     const data = await api.get(
@@ -276,6 +280,7 @@ export default function LogsScannerPage() {
       const job = await api.post(`/api/v1/logs/scans/${scan.id}/credential-test/`, {
         domain,
         target_url: targetUrl,
+        proxy_url: labProxyUrl.trim(),
         hit_ids: matchingHits.map((row) => row.id),
       });
       setLabJob(job);
@@ -404,6 +409,18 @@ export default function LogsScannerPage() {
         label: "Response",
         render: (row) => (row.response_time_ms ? `${row.response_time_ms} ms` : "—"),
       },
+      {
+        key: "external_ip",
+        label: "Login IP",
+        render: (row) => row.external_ip || "Unknown",
+      },
+      {
+        key: "proxy_server",
+        label: "Proxy",
+        nowrap: false,
+        sx: { overflowWrap: "anywhere" },
+        render: (row) => row.proxy_server || "Direct",
+      },
     ],
     []
   );
@@ -445,6 +462,26 @@ export default function LogsScannerPage() {
           label={`${row.status} · ${row.attempt_count || 0}/${row.success_count || 0}`}
         />
       ),
+    },
+    {
+      key: "external_ips",
+      label: "Login IP(s)",
+      nowrap: false,
+      render: (row) => {
+        const addresses = [...new Set(
+          (row.result_summary?.results || [])
+            .map((item) => String(item.external_ip || "").trim())
+            .filter(Boolean)
+        )];
+        return addresses.join(", ") || "Unknown";
+      },
+    },
+    {
+      key: "proxy_url",
+      label: "Proxy",
+      nowrap: false,
+      sx: { overflowWrap: "anywhere" },
+      render: (row) => row.proxy_url || row.result_summary?.proxy_url || "Direct",
     },
     {
       key: "visibility",
@@ -1225,6 +1262,15 @@ export default function LogsScannerPage() {
             onChange={(event) => setLabTargetUrl(event.target.value)}
             disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
           />
+          <TextField
+            size="small"
+            label="HTTP(S) proxy (optional)"
+            placeholder="http://proxy.lab:8080"
+            value={labProxyUrl}
+            onChange={(event) => setLabProxyUrl(event.target.value)}
+            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
+            helperText="Do not embed credentials"
+          />
           <Button
             variant="contained"
             color="warning"
@@ -1255,7 +1301,7 @@ export default function LogsScannerPage() {
         {labJob ? (
           <Box sx={{ mt: 1.5 }}>
             <Typography variant="caption" color="text.secondary">
-              Job #{labJob.id} · {labJob.target_url} · {labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
+              Job #{labJob.id} · {labJob.target_url} · {labJob.proxy_url ? `proxy ${labJob.proxy_url} · ` : "direct · "}{labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
             </Typography>
             <DataTable columns={labResultColumns} rows={labRows} empty="No result rows yet" />
           </Box>
@@ -1269,10 +1315,18 @@ export default function LogsScannerPage() {
             sx={{ mb: 1 }}
           >
             <Stack direction="row" spacing={1} alignItems="center">
+              <IconButton
+                size="small"
+                title={historyExpanded ? "Collapse history" : "Expand history"}
+                aria-label={historyExpanded ? "Collapse login attempt history" : "Expand login attempt history"}
+                onClick={() => setHistoryExpanded((current) => !current)}
+              >
+                {historyExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+              </IconButton>
               <Typography variant="subtitle2">Login attempt history</Typography>
               <Chip size="small" label={String(visibleLabHistory.length)} />
             </Stack>
-            <Stack direction="row" spacing={1}>
+            {historyExpanded ? <Stack direction="row" spacing={1}>
               <Button
                 size="small"
                 variant="outlined"
@@ -1291,14 +1345,16 @@ export default function LogsScannerPage() {
               >
                 Clear history
               </Button>
-            </Stack>
+            </Stack> : null}
           </Stack>
-          <DataTable
-            columns={labHistoryColumns}
-            rows={visibleLabHistory}
-            loading={historyBusy && !labHistory.length}
-            empty={showHiddenHistory ? "No login history yet" : "No visible login history"}
-          />
+          {historyExpanded ? (
+            <DataTable
+              columns={labHistoryColumns}
+              rows={visibleLabHistory}
+              loading={historyBusy && !labHistory.length}
+              empty={showHiddenHistory ? "No login history yet" : "No visible login history"}
+            />
+          ) : null}
         </Box>
       </Paper>
 

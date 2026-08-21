@@ -19,6 +19,7 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
+from urllib.request import ProxyHandler, build_opener
 
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
@@ -74,6 +75,24 @@ RUN_LOCK = asyncio.Semaphore(1)
 app = FastAPI(title="BreachSentinel BruteForceAI Lab Service", version="1.0.0")
 
 
+def _normalize_proxy_url(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    parsed = urlsplit(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("proxy_url must be an HTTP(S) proxy URL")
+    if parsed.username or parsed.password:
+        raise ValueError("proxy_url may not contain embedded credentials")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("proxy_url must contain only scheme, host, and optional port")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise ValueError("proxy_url contains an invalid port") from exc
+    return f"{parsed.scheme}://{parsed.netloc.rstrip('/')}"
+
+
 class Credential(BaseModel):
     username: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=1, max_length=1024)
@@ -89,9 +108,15 @@ class Credential(BaseModel):
 class ScanRequest(BaseModel):
     target_url: str = Field(min_length=8, max_length=2048)
     credentials: list[Credential] = Field(min_length=1, max_length=25)
+    proxy_url: str | None = Field(default=None, max_length=2048)
     # Backend-managed entries are sent per job so the UI can extend the
     # allowlist without changing the container environment or rebuilding it.
     allowed_hosts: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("proxy_url")
+    @classmethod
+    def valid_proxy_url(cls, value: str | None) -> str | None:
+        return _normalize_proxy_url(value)
 
 
 def _is_lab_host(host: str) -> bool:
@@ -172,7 +197,7 @@ def _read_latest_result(target_url: str, username: str, after_id: int = 0) -> di
         with sqlite3.connect(DATABASE) as connection:
             row = connection.execute(
                 """
-                SELECT success, response_time_ms, timestamp
+                SELECT success, response_time_ms, timestamp, proxy_server, external_ip
                 FROM brute_force_attempts
                 WHERE url=? AND username_or_email=? AND id>?
                 ORDER BY id DESC LIMIT 1
@@ -188,7 +213,23 @@ def _read_latest_result(target_url: str, username: str, after_id: int = 0) -> di
         "success": bool(row[0]),
         "response_time_ms": row[1],
         "timestamp": row[2],
+        "proxy_server": row[3] or "",
+        "external_ip": row[4] or "",
     }
+
+
+def _proxy_external_ip(proxy_url: str | None) -> str:
+    """Resolve the proxy exit IP without changing upstream login behavior."""
+    if not proxy_url:
+        return ""
+    try:
+        opener = build_opener(ProxyHandler({"http": proxy_url, "https": proxy_url}))
+        with opener.open("https://api.ipify.org", timeout=4) as response:
+            value = response.read(64).decode("ascii", errors="ignore").strip()
+        return str(ipaddress.ip_address(value))
+    except Exception as exc:
+        logger.warning("Proxy external IP probe failed: %s", type(exc).__name__)
+        return ""
 
 
 def _read_analysis(target_url: str) -> dict | None:
@@ -225,6 +266,8 @@ def _safe_output(output: str, request: ScanRequest) -> str:
             safe = safe.replace(credential.password, "[redacted]")
     if LLM_API_KEY:
         safe = safe.replace(LLM_API_KEY, "[redacted]")
+    if request.proxy_url:
+        safe = safe.replace(request.proxy_url, "[proxy]")
     return safe[-4000:]
 
 
@@ -282,7 +325,7 @@ def _first_visible_selector(page, candidates: list[str]) -> str | None:
     return None
 
 
-def _fallback_browser_analysis(target_url: str) -> dict | None:
+def _fallback_browser_analysis(target_url: str, proxy_url: str | None = None) -> dict | None:
     """Create the same selector/baseline record as stage1 for common forms.
 
     This is deliberately a fallback for when the configured LLM is unavailable;
@@ -315,7 +358,10 @@ def _fallback_browser_analysis(target_url: str) -> dict | None:
         with _virtual_display():
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=not SHOW_BROWSER)
-                context = browser.new_context(ignore_https_errors=True)
+                context_args = {"ignore_https_errors": True}
+                if proxy_url:
+                    context_args["proxy"] = {"server": proxy_url}
+                context = browser.new_context(**context_args)
                 page = context.new_page()
                 page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
                 try:
@@ -396,6 +442,8 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
     if not command_path.is_file():
         return {"status": "failed", "error": "BruteForceAI source is unavailable", "results": []}
 
+    proxy_external_ip = _proxy_external_ip(request.proxy_url)
+
     with tempfile.TemporaryDirectory(prefix="bs-bfai-") as temp_dir:
         root = Path(temp_dir)
         urls = root / "urls.txt"
@@ -429,6 +477,8 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
                     analyze_command.extend(["--llm-api-key", LLM_API_KEY])
                 if OLLAMA_URL:
                     analyze_command.extend(["--ollama-url", OLLAMA_URL])
+                if request.proxy_url:
+                    analyze_command.extend(["--proxy", request.proxy_url])
                 try:
                     analyzed = subprocess.run(
                         _run_command(analyze_command),
@@ -446,7 +496,7 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
 
             fallback_used = False
             if not analysis and AUTO_SELECTOR_FALLBACK:
-                analysis = _fallback_browser_analysis(target_url)
+                analysis = _fallback_browser_analysis(target_url, request.proxy_url)
                 fallback_used = bool(analysis)
             if not analysis:
                 diagnostics = _safe_output(analyzed.stdout if analyzed else "", request)
@@ -507,6 +557,8 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
                 "--database",
                 str(DATABASE),
             ]
+            if request.proxy_url:
+                command.extend(["--proxy", request.proxy_url])
             try:
                 completed = subprocess.run(
                     _run_command(command),
@@ -546,6 +598,10 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
                     "success_count": sum(1 for item in results if item["success"]),
                     "results": results,
                 }
+            if request.proxy_url:
+                result["proxy_server"] = request.proxy_url
+                # Do not report the host IP as a proxy exit IP when the proxy probe fails.
+                result["external_ip"] = proxy_external_ip
             results.append(result)
             _redact_database()
             if result["success"]:
