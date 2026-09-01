@@ -187,6 +187,33 @@ UI: http://localhost:3000/intelligence
 
 Without AI keys, briefings use a **local template** (OPSEC-safe offline mode). MISP calls return `skipped` until `MISP_URL` + `MISP_API_KEY` are set.
 
+## Dark Web Investigations
+
+The staff-only `/dark-web` workspace adapts Robin's useful investigation flow to
+BreachSentinel's existing Django, Celery, PostgreSQL and Tor stack:
+
+1. refine an analyst query (Groq with deterministic fallback);
+2. search a catalog of onion search engines concurrently through Tor;
+3. validate and deduplicate v3 `.onion` results;
+4. fetch a bounded number of text/HTML pages with byte, timeout and redirect limits;
+5. persist source provenance and generate a source-cited defensive report;
+6. retain investigation history, pivots and evidence-grounded follow-up messages.
+
+| Action | Endpoint |
+|--------|----------|
+| List/create investigations | `GET/POST /api/v1/darkweb/investigations/` |
+| Check Tor/engine health | `GET /api/v1/darkweb/investigations/health/` |
+| View collected source metadata | `GET /api/v1/darkweb/investigations/{id}/sources/` |
+| Ask an evidence follow-up | `POST /api/v1/darkweb/investigations/{id}/followup/` |
+
+The backend never fetches a URL supplied directly by the analyst. Every fetch and
+redirect must remain a validated v3 onion URL returned by a configured engine.
+Raw page excerpts stay server-side; the API exposes source metadata and report
+citations to staff. If Groq is unavailable, collection is retained with a partial,
+non-inferential local report instead of fabricated analysis.
+Attribution for the Robin-derived workflow/catalog is in
+[`docs/THIRD_PARTY_NOTICES.md`](docs/THIRD_PARTY_NOTICES.md).
+
 ## Development phases
 
 1. **Phase 1** — Scaffolding & Docker infra
@@ -202,7 +229,8 @@ Watcher-style upgrades (Watch Rules, CERT RSS, ransomlook fallback, weekly/keywo
 
 - All secrets live in `.env` (see `.env.example`).
 - `.env` is gitignored — never hardcode API keys (Hudson Rock, Anthropic, MISP, etc.).
-- Data stays local (Postgres). No telemetry in Phase 1.
+- Investigation history stays in local Postgres; optional Groq synthesis sends only
+  bounded evidence excerpts to the configured provider.
 
 ## Local development (without full Compose)
 

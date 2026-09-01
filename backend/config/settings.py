@@ -162,6 +162,7 @@ REST_FRAMEWORK = {
         "user": "300/min",
         "auth": "20/min",
         "github_scan_create": "5/hour",
+        "darkweb_investigation_create": "6/hour",
         "log_scan_create": "30/hour",
     },
 }
@@ -406,6 +407,12 @@ WIRE_WORDPRESS_SOURCES_PER_SWEEP = env.int(
 RSS_PROCESSING_VERSION = env.int("RSS_PROCESSING_VERSION", default=5)
 TOR_ENABLED = env.bool("TOR_ENABLED", default=False)
 TOR_SOCKS_PROXY = env("TOR_SOCKS_PROXY", default="socks5h://tor:9150")
+DARKWEB_ENABLED = env.bool("DARKWEB_ENABLED", default=TOR_ENABLED)
+DARKWEB_CONCURRENCY = env.int("DARKWEB_CONCURRENCY", default=4)
+DARKWEB_SEARCH_TIMEOUT_SEC = env.float("DARKWEB_SEARCH_TIMEOUT_SEC", default=25)
+DARKWEB_SCRAPE_TIMEOUT_SEC = env.float("DARKWEB_SCRAPE_TIMEOUT_SEC", default=40)
+DARKWEB_MAX_RESPONSE_BYTES = env.int("DARKWEB_MAX_RESPONSE_BYTES", default=1_000_000)
+DARKWEB_STALE_MINUTES = env.int("DARKWEB_STALE_MINUTES", default=30)
 PROXYNOVA_API_KEY = env("PROXYNOVA_API_KEY", default="")
 BREACHDIRECTORY_API_KEY = env("BREACHDIRECTORY_API_KEY", default="")
 MISP_URL = env("MISP_URL", default="")

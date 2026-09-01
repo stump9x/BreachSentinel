@@ -23,7 +23,12 @@ from apps.integrations.misp.sync import (
     import_attributes_from_misp,
 )
 from apps.integrations.github.client import github_configured
-from apps.integrations.models import AIBriefing, GitHubScan, IntegrationSyncLog
+from apps.integrations.models import (
+    AIBriefing,
+    DarkWebInvestigation,
+    GitHubScan,
+    IntegrationSyncLog,
+)
 from apps.integrations.searx.client import searx_configured, search_searx
 from apps.integrations.searx.leak_scan import (
     ingest_searx_hits,
@@ -31,6 +36,11 @@ from apps.integrations.searx.leak_scan import (
 )
 from apps.integrations.serializers import (
     AIBriefingSerializer,
+    DarkWebFollowupSerializer,
+    DarkWebInvestigationCreateSerializer,
+    DarkWebInvestigationSerializer,
+    DarkWebMessageSerializer,
+    DarkWebSourceSerializer,
     ExtractEntitiesSerializer,
     GenerateBriefingSerializer,
     GitHubFindingSerializer,
@@ -49,6 +59,7 @@ from apps.integrations.tasks import (
     misp_export_task,
     misp_import_task,
     scan_searx_leaks,
+    run_darkweb_investigation_task,
     run_github_scan_task,
 )
 
@@ -659,9 +670,7 @@ class GitHubScanViewSet(
                 non_text_count=Count("id", filter=Q(is_text_file=False)),
                 text_count=Count("id", filter=Q(is_text_file=True)),
             )
-            # Hide weak repos that only have a single .txt hit.
             .exclude(non_text_count=0, text_count=1, file_count=1)
-            # Repos with real secret alerts first.
             .order_by(
                 "-alert_count",
                 "-non_text_count",
@@ -675,3 +684,171 @@ class GitHubScanViewSet(
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+
+class DarkWebInvestigationViewSet(
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
+    queryset = DarkWebInvestigation.objects.select_related("created_by").all()
+    serializer_class = DarkWebInvestigationSerializer
+    permission_classes = [IsStaffUser]
+    filterset_fields = ("status", "preset")
+    search_fields = ("query", "refined_query")
+    ordering_fields = ("created_at", "source_count", "scraped_count")
+    ordering = ("-created_at", "-id")
+
+    def get_throttles(self):
+        self.throttle_scope = (
+            "darkweb_investigation_create"
+            if getattr(self, "action", None) in {"create", "followup", "health"}
+            else None
+        )
+        return super().get_throttles()
+
+    def create(self, request, *args, **kwargs):
+        if not bool(getattr(settings, "DARKWEB_ENABLED", False)):
+            return Response(
+                {"detail": "Dark-web investigations are disabled."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if not bool(getattr(settings, "TOR_ENABLED", False)):
+            return Response(
+                {"detail": "Tor is disabled. Set TOR_ENABLED=true."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        serializer = DarkWebInvestigationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        stale_minutes = max(
+            10,
+            int(getattr(settings, "DARKWEB_STALE_MINUTES", 30) or 30),
+        )
+        stale_cutoff = timezone.now() - timedelta(minutes=stale_minutes)
+        DarkWebInvestigation.objects.filter(
+            status__in=(
+                DarkWebInvestigation.Status.QUEUED,
+                DarkWebInvestigation.Status.RUNNING,
+            ),
+            updated_at__lt=stale_cutoff,
+        ).update(
+            status=DarkWebInvestigation.Status.FAILED,
+            active_slot=None,
+            error_message="Investigation exceeded the execution window.",
+            completed_at=timezone.now(),
+        )
+        active = DarkWebInvestigation.objects.filter(active_slot=True).first()
+        if active:
+            return Response(
+                {
+                    "detail": "A dark-web investigation is already queued or running.",
+                    "investigation_id": active.id,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        data = serializer.validated_data
+        try:
+            investigation = DarkWebInvestigation.objects.create(
+                query=data["query"],
+                preset=data["preset"],
+                parameters={
+                    "max_results": data["max_results"],
+                    "max_pages": data["max_pages"],
+                },
+                created_by=request.user,
+            )
+        except IntegrityError:
+            active = DarkWebInvestigation.objects.filter(active_slot=True).first()
+            return Response(
+                {
+                    "detail": "A dark-web investigation is already queued or running.",
+                    "investigation_id": active.id if active else None,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            task = run_darkweb_investigation_task.delay(investigation.id)
+        except Exception:  # noqa: BLE001
+            investigation.status = DarkWebInvestigation.Status.FAILED
+            investigation.error_message = "Task queue unavailable."
+            investigation.completed_at = timezone.now()
+            investigation.save(
+                update_fields=["status", "error_message", "completed_at", "updated_at"]
+            )
+            return Response(
+                {"detail": "Unable to queue investigation.", "investigation_id": investigation.id},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(
+            {**DarkWebInvestigationSerializer(investigation).data, "task_id": task.id},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        investigation = self.get_object()
+        if investigation.status in {
+            DarkWebInvestigation.Status.QUEUED,
+            DarkWebInvestigation.Status.RUNNING,
+        }:
+            return Response(
+                {"detail": "Cannot delete a queued or running investigation."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        investigation_id = investigation.id
+        investigation.delete()
+        return Response({"deleted": [investigation_id]}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def health(self, request):
+        from apps.integrations.darkweb.engine import probe_engines
+
+        return Response(probe_engines(limit=4))
+
+    @action(detail=True, methods=["get"])
+    def sources(self, request, pk=None):
+        investigation = self.get_object()
+        queryset = investigation.sources.all()
+        fetch_status = (request.query_params.get("fetch_status") or "").strip().lower()
+        if fetch_status in {"found", "scraped", "failed", "skipped"}:
+            queryset = queryset.filter(fetch_status=fetch_status)
+        page = self.paginate_queryset(queryset)
+        serializer = DarkWebSourceSerializer(page or queryset, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def messages(self, request, pk=None):
+        investigation = self.get_object()
+        return Response(DarkWebMessageSerializer(investigation.messages.all(), many=True).data)
+
+    @action(detail=True, methods=["post"])
+    def followup(self, request, pk=None):
+        from apps.integrations.darkweb.service import answer_followup
+
+        investigation = self.get_object()
+        if investigation.status not in {
+            DarkWebInvestigation.Status.COMPLETED,
+            DarkWebInvestigation.Status.PARTIAL,
+        }:
+            return Response(
+                {"detail": "Follow-up is available after evidence collection finishes."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        serializer = DarkWebFollowupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            message = answer_followup(
+                investigation,
+                serializer.validated_data["question"],
+                user=request.user,
+            )
+        except Exception:  # noqa: BLE001
+            return Response(
+                {"detail": "Evidence-grounded follow-up is temporarily unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(
+            DarkWebMessageSerializer(message).data,
+            status=status.HTTP_201_CREATED,
+        )

@@ -15,6 +15,13 @@ const STATUS = {
   unknown: "warning",
   ok: "success",
   new: "info",
+  queued: "info",
+  running: "warning",
+  completed: "success",
+  partial: "warning",
+  failed: "error",
+  scraped: "success",
+  skipped: "default",
 };
 
 export function SeverityChip({ value }) {

@@ -186,3 +186,139 @@ class GitHubFinding(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.repository}:{self.file_path}"
+
+
+class DarkWebInvestigation(TimeStampedModel):
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        PARTIAL = "partial", "Partial"
+        FAILED = "failed", "Failed"
+
+    class Preset(models.TextChoices):
+        THREAT_INTEL = "threat_intel", "Threat intelligence"
+        RANSOMWARE = "ransomware_malware", "Ransomware / malware"
+        IDENTITY = "personal_identity", "Personal identity exposure"
+        CORPORATE = "corporate_espionage", "Corporate exposure"
+
+    query = models.CharField(max_length=512, db_index=True)
+    refined_query = models.CharField(max_length=256, blank=True)
+    preset = models.CharField(
+        max_length=32, choices=Preset.choices, default=Preset.THREAT_INTEL
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.QUEUED, db_index=True
+    )
+    summary = models.TextField(blank=True)
+    pivots = models.JSONField(default=list, blank=True)
+    parameters = models.JSONField(default=dict, blank=True)
+    engine_stats = models.JSONField(default=list, blank=True)
+    raw_result_count = models.PositiveIntegerField(default=0)
+    source_count = models.PositiveIntegerField(default=0)
+    scraped_count = models.PositiveIntegerField(default=0)
+    provider = models.CharField(max_length=32, blank=True)
+    model = models.CharField(max_length=128, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    active_slot = models.BooleanField(null=True, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="dark_web_investigations",
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["active_slot"],
+                condition=models.Q(active_slot=True),
+                name="uniq_active_darkweb_investigation",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.query}:{self.status}"
+
+    def save(self, *args, **kwargs):
+        self.active_slot = (
+            True
+            if self.status in {self.Status.QUEUED, self.Status.RUNNING}
+            else None
+        )
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"active_slot"}
+        return super().save(*args, **kwargs)
+
+
+class DarkWebSource(TimeStampedModel):
+    class FetchStatus(models.TextChoices):
+        FOUND = "found", "Found"
+        SCRAPED = "scraped", "Scraped"
+        FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
+
+    investigation = models.ForeignKey(
+        DarkWebInvestigation, on_delete=models.CASCADE, related_name="sources"
+    )
+    engine = models.CharField(max_length=64, db_index=True)
+    title = models.CharField(max_length=512)
+    url = models.URLField(max_length=2048)
+    url_hash = models.CharField(max_length=64)
+    fetch_status = models.CharField(
+        max_length=16,
+        choices=FetchStatus.choices,
+        default=FetchStatus.FOUND,
+        db_index=True,
+    )
+    content_excerpt = models.TextField(blank=True)
+    content_hash = models.CharField(max_length=64, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["investigation", "url_hash"],
+                name="uniq_darkweb_investigation_url",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["investigation", "fetch_status"],
+                name="darkweb_inv_fetch_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.engine}:{self.title}"
+
+
+class DarkWebMessage(TimeStampedModel):
+    class Role(models.TextChoices):
+        USER = "user", "User"
+        ASSISTANT = "assistant", "Assistant"
+
+    investigation = models.ForeignKey(
+        DarkWebInvestigation, on_delete=models.CASCADE, related_name="messages"
+    )
+    role = models.CharField(max_length=16, choices=Role.choices)
+    content = models.TextField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="dark_web_messages",
+    )
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.investigation_id}:{self.role}"

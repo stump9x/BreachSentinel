@@ -29,6 +29,7 @@ import RssFeedOutlinedIcon from "@mui/icons-material/RssFeedOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import DocumentScannerOutlinedIcon from "@mui/icons-material/DocumentScannerOutlined";
+import PolicyOutlinedIcon from "@mui/icons-material/PolicyOutlined";
 import { useAuth } from "../auth/AuthContext";
 import { loadNavOpenPreference, writeNavOpenPreference } from "./navPreference";
 
@@ -42,6 +43,7 @@ const NAV = [
   { to: "/leaks", label: "Data Leaks", icon: <WaterDropOutlinedIcon fontSize="small" /> },
   { to: "/osint", label: "OSINT Scan", icon: <TravelExploreOutlinedIcon fontSize="small" /> },
   { to: "/logs-scanner", label: "Logs Scanner", icon: <DocumentScannerOutlinedIcon fontSize="small" /> },
+  { to: "/dark-web", label: "Dark Web", icon: <PolicyOutlinedIcon fontSize="small" /> },
   { to: "/github-scanner", label: "GitHub Scanner", icon: <GitHubIcon fontSize="small" /> },
   { to: "/workers", label: "Workers", icon: <BoltOutlinedIcon fontSize="small" /> },
   { to: "/watch-rules", label: "Watch Rules", icon: <VisibilityOutlinedIcon fontSize="small" /> },

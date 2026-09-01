@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AIBriefingViewSet,
+    DarkWebInvestigationViewSet,
     ExtractEntitiesView,
     ForumClaimIngestView,
     GenerateBriefingView,
@@ -22,6 +23,11 @@ router = DefaultRouter()
 router.register(r"ai/briefings", AIBriefingViewSet, basename="ai-briefing")
 router.register(r"integrations/logs", IntegrationSyncLogViewSet, basename="integration-log")
 router.register(r"github/scans", GitHubScanViewSet, basename="github-scan")
+router.register(
+    r"darkweb/investigations",
+    DarkWebInvestigationViewSet,
+    basename="darkweb-investigation",
+)
 
 urlpatterns = [
     path("integrations/health/", IntegrationsHealthView.as_view(), name="integrations-health"),

@@ -2,6 +2,9 @@ from rest_framework import serializers
 
 from apps.integrations.models import (
     AIBriefing,
+    DarkWebInvestigation,
+    DarkWebMessage,
+    DarkWebSource,
     GitHubFinding,
     GitHubScan,
     IntegrationSyncLog,
@@ -172,3 +175,60 @@ class ForumClaimItemSerializer(serializers.Serializer):
 class ForumClaimIngestSerializer(serializers.Serializer):
     items = ForumClaimItemSerializer(many=True)
     async_mode = serializers.BooleanField(default=False)
+
+
+class DarkWebInvestigationCreateSerializer(serializers.Serializer):
+    query = serializers.CharField(min_length=2, max_length=512, trim_whitespace=True)
+    preset = serializers.ChoiceField(
+        choices=DarkWebInvestigation.Preset.choices,
+        default=DarkWebInvestigation.Preset.THREAT_INTEL,
+    )
+    max_results = serializers.IntegerField(min_value=5, max_value=60, default=40)
+    max_pages = serializers.IntegerField(min_value=1, max_value=10, default=5)
+
+    def validate_query(self, value):
+        if any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Control characters are not allowed.")
+        return " ".join(value.split())
+
+
+class DarkWebInvestigationSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = DarkWebInvestigation
+        fields = (
+            "id", "query", "refined_query", "preset", "status", "summary", "pivots",
+            "parameters", "engine_stats", "raw_result_count", "source_count", "scraped_count",
+            "provider", "model", "error_message", "started_at", "completed_at",
+            "created_by", "created_by_username", "created_at", "updated_at",
+        )
+        read_only_fields = fields
+
+
+class DarkWebSourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DarkWebSource
+        fields = (
+            "id", "engine", "title", "url", "fetch_status",
+            "content_hash", "metadata", "created_at", "updated_at",
+        )
+        read_only_fields = fields
+
+
+class DarkWebMessageSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = DarkWebMessage
+        fields = ("id", "role", "content", "created_by_username", "created_at")
+        read_only_fields = fields
+
+
+class DarkWebFollowupSerializer(serializers.Serializer):
+    question = serializers.CharField(min_length=2, max_length=1000, trim_whitespace=True)
+
+    def validate_question(self, value):
+        if any(ord(char) < 32 and char not in "\n\t" for char in value):
+            raise serializers.ValidationError("Unsupported control character.")
+        return value.strip()

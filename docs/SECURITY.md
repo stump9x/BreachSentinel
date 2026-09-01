@@ -15,6 +15,8 @@
 | Data-plane ports | Bind `127.0.0.1` for db/redis/osint/searx |
 | Weak DEBUG=False secrets | Startup refuse placeholders (+ Redis password) |
 | Searx abuse | Host port bound to localhost; JSON API used only by internal services |
+| Dark-web SSRF / redirect escape | Staff-only; static engine catalog; v3 `.onion` validation on every fetch and redirect; Tor-only client; bounded bytes/time/concurrency |
+| Dark-web prompt injection | Onion text is marked untrusted; grounded prompts require source labels; raw excerpts are not returned by API |
 | Frontend headers | CSP / nosniff / frame / referrer |
 
 ## Ops

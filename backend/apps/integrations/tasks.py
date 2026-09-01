@@ -229,3 +229,46 @@ def run_github_scan_task(scan_id: int) -> dict:
         "files": scan.file_count,
         "alerts": scan.alert_count,
     }
+
+
+@shared_task(name="integrations.run_darkweb_investigation")
+def run_darkweb_investigation_task(investigation_id: int) -> dict:
+    from django.db import transaction
+    from django.utils import timezone
+
+    from apps.integrations.darkweb.service import run_investigation
+    from apps.integrations.models import DarkWebInvestigation
+
+    with transaction.atomic():
+        investigation = DarkWebInvestigation.objects.select_for_update().get(
+            pk=investigation_id
+        )
+        if investigation.status != DarkWebInvestigation.Status.QUEUED:
+            return {
+                "id": investigation.id,
+                "status": investigation.status,
+                "skipped": True,
+            }
+        investigation.status = DarkWebInvestigation.Status.RUNNING
+        investigation.started_at = timezone.now()
+        investigation.save(update_fields=["status", "started_at", "updated_at"])
+    try:
+        run_investigation(investigation)
+    except Exception as exc:  # noqa: BLE001
+        investigation.status = DarkWebInvestigation.Status.FAILED
+        investigation.error_message = str(exc)[:1000] or "Investigation failed."
+        investigation.completed_at = timezone.now()
+        investigation.save(
+            update_fields=[
+                "status",
+                "error_message",
+                "completed_at",
+                "updated_at",
+            ]
+        )
+    return {
+        "id": investigation.id,
+        "status": investigation.status,
+        "sources": investigation.source_count,
+        "scraped": investigation.scraped_count,
+    }
