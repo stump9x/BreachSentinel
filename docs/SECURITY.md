@@ -41,7 +41,10 @@ never returned verbatim by the API or retained in BruteForceAI result records. W
 the stack runs in Docker, use `host.docker.internal` to reach a proxy running on the
 Docker host. Staff can pin an encrypted proxy profile to their account and reuse it
 without re-entering credentials; history exposes only the proxy endpoint label and
-validated source/exit IP metadata.
+validated source/exit IP metadata. Exit-IP probing uses the same Playwright proxy
+stack as the login attempt (including SOCKS4/SOCKS5); if the proxy blocks the
+diagnostic endpoints, the history marks the IP as unavailable instead of reporting
+the VPS address.
 
 ## Still later
 

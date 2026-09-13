@@ -19,7 +19,6 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.parse import unquote, urlsplit, urlunsplit
-from urllib.request import ProxyHandler, build_opener
 
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
@@ -230,17 +229,38 @@ def _read_latest_result(target_url: str, username: str, after_id: int = 0) -> di
 
 
 def _proxy_external_ip(proxy_url: str | None) -> str:
-    """Resolve the proxy exit IP without changing upstream login behavior."""
+    """Resolve the proxy exit IP using the same proxy stack as browser login.
+
+    ``urllib`` does not natively support SOCKS4/SOCKS5, so the old probe could
+    silently return an empty IP even when Playwright successfully logged in
+    through the proxy. Playwright's API request context supports all proxy
+    schemes accepted by the scanner and keeps this diagnostic independent of
+    the upstream BruteForceAI database.
+    """
     if not proxy_url:
         return ""
     try:
-        opener = build_opener(ProxyHandler({"http": proxy_url, "https": proxy_url}))
-        with opener.open("https://api.ipify.org", timeout=4) as response:
-            value = response.read(64).decode("ascii", errors="ignore").strip()
-        return str(ipaddress.ip_address(value))
+        with sync_playwright() as playwright:
+            request = playwright.request.new_context(
+                proxy=playwright_proxy_options(proxy_url),
+                timeout=5000,
+                ignore_https_errors=True,
+            )
+            try:
+                for endpoint in ("https://api.ipify.org", "https://ifconfig.me/ip"):
+                    response = request.get(endpoint)
+                    if not response.ok:
+                        continue
+                    value = response.text().strip()
+                    try:
+                        return str(ipaddress.ip_address(value))
+                    except ValueError:
+                        continue
+            finally:
+                request.dispose()
     except Exception as exc:
         logger.warning("Proxy external IP probe failed: %s", type(exc).__name__)
-        return ""
+    return ""
 
 
 def _read_analysis(target_url: str) -> dict | None:
@@ -615,8 +635,9 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
                 }
             if request.proxy_url:
                 result["proxy_server"] = "configured"
-                # Do not report the host IP as a proxy exit IP when the proxy probe fails.
+                # Do not report the host IP as a proxy exit IP when the probe fails.
                 result["external_ip"] = proxy_external_ip
+                result["external_ip_status"] = "available" if proxy_external_ip else "proxy_probe_failed"
             results.append(result)
             _redact_database()
             if result["success"]:

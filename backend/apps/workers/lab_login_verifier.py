@@ -217,6 +217,7 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "response_time_ms": item.get("response_time_ms"),
                 "timestamp": item.get("timestamp"),
                 "external_ip": _safe_external_ip(item.get("external_ip")),
+                "external_ip_status": str(item.get("external_ip_status") or ""),
                 "proxy_server": "configured" if item.get("proxy_server") or proxy_url else "",
             }
             for item in payload.get("results") or []

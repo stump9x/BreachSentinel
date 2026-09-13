@@ -8,12 +8,12 @@ import {
   CircularProgress,
   IconButton,
   LinearProgress,
-  MenuItem,
   Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
 import CloseIcon from "@mui/icons-material/Close";
@@ -168,6 +168,7 @@ export default function LogsScannerPage() {
   const [labProxyProfileId, setLabProxyProfileId] = useState("");
   const [labProxyProfileName, setLabProxyProfileName] = useState("");
   const [proxyProfileBusy, setProxyProfileBusy] = useState(false);
+  const [proxyEditorOpen, setProxyEditorOpen] = useState(false);
   const [labJob, setLabJob] = useState(null);
   const [labBusy, setLabBusy] = useState(false);
   const [labAllowlist, setLabAllowlist] = useState([]);
@@ -218,6 +219,17 @@ export default function LogsScannerPage() {
     setLabProxyProfiles(rows);
     setLabProxyProfileId((current) => current || String(rows.find((row) => row.is_default)?.id || ""));
   }, []);
+
+  const selectLabProxyProfile = (profileId) => {
+    const value = String(profileId || "");
+    setLabProxyProfileId(value);
+    if (value) {
+      setLabProxyUrl("");
+      setLabProxyUsername("");
+      setLabProxyPassword("");
+      setProxyEditorOpen(false);
+    }
+  };
 
   const loadLabHistory = useCallback(async () => {
     const data = await api.get(
@@ -316,8 +328,11 @@ export default function LogsScannerPage() {
       });
       await loadLabProxyProfiles();
       setLabProxyProfileId(String(profile.id));
+      setLabProxyUrl("");
+      setLabProxyUsername("");
       setLabProxyProfileName("");
       setLabProxyPassword("");
+      setProxyEditorOpen(false);
       setMessage(`Proxy ${profile.name} đã được ghim và mã hóa an toàn.`);
     } catch (err) {
       setError(err.message || "Failed to save proxy profile");
@@ -326,14 +341,14 @@ export default function LogsScannerPage() {
     }
   };
 
-  const deleteLabProxyProfile = async () => {
-    if (!labProxyProfileId) return;
-    const profile = labProxyProfiles.find((row) => String(row.id) === String(labProxyProfileId));
+  const deleteLabProxyProfile = async (profileId = labProxyProfileId) => {
+    if (!profileId) return;
+    const profile = labProxyProfiles.find((row) => String(row.id) === String(profileId));
     if (!window.confirm(`Bỏ proxy đã ghim${profile?.name ? ` ${profile.name}` : ""}?`)) return;
     setProxyProfileBusy(true);
     try {
-      await api.delete(`/api/v1/logs/proxy-profiles/${labProxyProfileId}/`);
-      setLabProxyProfileId("");
+      await api.delete(`/api/v1/logs/proxy-profiles/${profileId}/`);
+      if (String(profileId) === String(labProxyProfileId)) setLabProxyProfileId("");
       await loadLabProxyProfiles();
       setMessage("Đã bỏ proxy đã ghim.");
     } catch (err) {
@@ -442,7 +457,11 @@ export default function LogsScannerPage() {
       {
         key: "external_ip",
         label: "Login IP",
-        render: (row) => row.external_ip || "Unknown",
+        render: (row) => row.external_ip || (
+          row.external_ip_status === "proxy_probe_failed"
+            ? "Không lấy được IP proxy"
+            : "Unknown"
+        ),
       },
       {
         key: "proxy_server",
@@ -503,7 +522,10 @@ export default function LogsScannerPage() {
             .map((item) => String(item.external_ip || "").trim())
             .filter(Boolean)
         )];
-        return addresses.join(", ") || "Unknown";
+        if (addresses.length) return addresses.join(", ");
+        const hasProxyProbeFailure = (row.result_summary?.results || [])
+          .some((item) => item.external_ip_status === "proxy_probe_failed");
+        return hasProxyProbeFailure ? "Không lấy được IP proxy" : "Unknown";
       },
     },
     {
@@ -1270,83 +1292,149 @@ export default function LogsScannerPage() {
             onChange={(event) => setLabTargetUrl(event.target.value)}
             disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
           />
-          <TextField
-            size="small"
-            select
-            label="Proxy đã ghim"
-            value={labProxyProfileId}
-            onChange={(event) => {
-              const value = event.target.value;
-              setLabProxyProfileId(value);
-              if (value) {
-                setLabProxyUrl("");
-                setLabProxyUsername("");
-                setLabProxyPassword("");
-              }
-            }}
-            disabled={labBusy || proxyProfileBusy}
-            sx={{ minWidth: 210 }}
+          <Paper
+            variant="outlined"
+            sx={{ flex: "1 1 100%", p: 1.25, borderRadius: 2, bgcolor: "background.default" }}
           >
-            <MenuItem value="">Proxy mới / nhập tay</MenuItem>
-            {labProxyProfiles.map((profile) => (
-              <MenuItem key={profile.id} value={String(profile.id)}>
-                {profile.name} · {profile.proxy_display}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            size="small"
-            label="Proxy server (optional)"
-            placeholder="socks5://proxy.lab:1080"
-            value={labProxyUrl}
-            onChange={(event) => setLabProxyUrl(event.target.value)}
-            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy || Boolean(labProxyProfileId)}
-          />
-          <TextField
-            size="small"
-            label="Proxy username"
-            value={labProxyUsername}
-            onChange={(event) => setLabProxyUsername(event.target.value)}
-            disabled={!labProxyUrl.trim() || labBusy || Boolean(labProxyProfileId)}
-            autoComplete="off"
-          />
-          <TextField
-            size="small"
-            type="password"
-            label="Proxy password"
-            value={labProxyPassword}
-            onChange={(event) => setLabProxyPassword(event.target.value)}
-            disabled={!labProxyUrl.trim() || labBusy || Boolean(labProxyProfileId)}
-            autoComplete="new-password"
-          />
-          {!labProxyProfileId ? (
-            <>
-              <TextField
-                size="small"
-                label="Tên proxy ghim"
-                placeholder="VPS proxy chính"
-                value={labProxyProfileName}
-                onChange={(event) => setLabProxyProfileName(event.target.value)}
-                disabled={!labProxyUrl.trim() || proxyProfileBusy}
-              />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} justifyContent="space-between">
+              <Box>
+                <Typography variant="subtitle2">Proxy login</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Chọn một proxy đã lưu bằng dấu tích, hoặc dùng trực tiếp không qua proxy.
+                </Typography>
+              </Box>
               <Button
-                variant="outlined"
-                onClick={saveLabProxyProfile}
-                disabled={!labProxyUrl.trim() || !labProxyProfileName.trim() || proxyProfileBusy}
+                size="small"
+                variant={proxyEditorOpen ? "contained" : "outlined"}
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() => setProxyEditorOpen((current) => !current)}
+                disabled={labBusy || proxyProfileBusy}
               >
-                {proxyProfileBusy ? <CircularProgress size={18} /> : "Ghim proxy"}
+                Add proxy
               </Button>
-            </>
-          ) : (
-            <Button
-              variant="text"
-              color="error"
-              onClick={deleteLabProxyProfile}
-              disabled={proxyProfileBusy}
-            >
-              Bỏ proxy ghim
-            </Button>
-          )}
+            </Stack>
+            <Stack spacing={0.5} sx={{ mt: 1 }}>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                alignItems="center"
+                sx={{ px: 0.5, py: 0.25, borderRadius: 1, cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+                onClick={() => selectLabProxyProfile("")}
+              >
+                <Checkbox
+                  size="small"
+                  checked={!labProxyProfileId}
+                  disabled={labBusy || proxyProfileBusy}
+                  onChange={() => selectLabProxyProfile("")}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2">Không dùng proxy</Typography>
+                  <Typography variant="caption" color="text.secondary">Kết nối trực tiếp từ worker</Typography>
+                </Box>
+              </Stack>
+              {labProxyProfiles.map((profile) => {
+                const selected = String(profile.id) === String(labProxyProfileId);
+                return (
+                  <Stack
+                    key={profile.id}
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    sx={{ px: 0.5, py: 0.25, borderRadius: 1, cursor: "pointer", bgcolor: selected ? "action.selected" : "transparent", "&:hover": { bgcolor: "action.hover" } }}
+                    onClick={() => selectLabProxyProfile(profile.id)}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={selected}
+                      disabled={labBusy || proxyProfileBusy}
+                      onChange={() => selectLabProxyProfile(profile.id)}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Typography variant="body2" noWrap>{profile.name}</Typography>
+                        {profile.is_default ? <Chip size="small" label="Mặc định" color="info" variant="outlined" /> : null}
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                        {profile.proxy_display}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      title="Xóa proxy đã lưu"
+                      disabled={proxyProfileBusy || labBusy}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        deleteLabProxyProfile(profile.id);
+                      }}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                );
+              })}
+              {!labProxyProfiles.length ? (
+                <Typography variant="caption" color="text.secondary" sx={{ px: 0.5, py: 0.5 }}>
+                  Chưa có proxy đã lưu. Bấm “Add proxy” để thêm.
+                </Typography>
+              ) : null}
+            </Stack>
+            {proxyEditorOpen ? (
+              <Stack spacing={1} sx={{ mt: 1.25, pt: 1.25, borderTop: 1, borderColor: "divider" }}>
+                <Typography variant="caption" color="text.secondary">
+                  Nhập URL đầy đủ (ví dụ <code>http://user:pass@host:8080</code>) hoặc dạng <code>host:port</code>. Hỗ trợ HTTP(S), SOCKS4/5.
+                </Typography>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Proxy URL hoặc host:port"
+                    placeholder="socks5://proxy.lab:1080 hoặc proxy.lab:1080"
+                    value={labProxyUrl}
+                    onChange={(event) => setLabProxyUrl(event.target.value)}
+                    disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy || proxyProfileBusy}
+                  />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Tên proxy"
+                    placeholder="VPS proxy chính"
+                    value={labProxyProfileName}
+                    onChange={(event) => setLabProxyProfileName(event.target.value)}
+                    disabled={proxyProfileBusy}
+                  />
+                </Stack>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Username (nếu URL không có)"
+                    value={labProxyUsername}
+                    onChange={(event) => setLabProxyUsername(event.target.value)}
+                    disabled={!labProxyUrl.trim() || proxyProfileBusy}
+                    autoComplete="off"
+                  />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="password"
+                    label="Password (nếu URL không có)"
+                    value={labProxyPassword}
+                    onChange={(event) => setLabProxyPassword(event.target.value)}
+                    disabled={!labProxyUrl.trim() || proxyProfileBusy}
+                    autoComplete="new-password"
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={saveLabProxyProfile}
+                    disabled={!labProxyUrl.trim() || !labProxyProfileName.trim() || proxyProfileBusy}
+                  >
+                    {proxyProfileBusy ? <CircularProgress size={18} /> : "Lưu proxy"}
+                  </Button>
+                </Stack>
+              </Stack>
+            ) : null}
+          </Paper>
           <Button
             variant="contained"
             color="warning"
