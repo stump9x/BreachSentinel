@@ -30,7 +30,14 @@ from apps.workers.lab_login_verifier import (
     normalize_lab_proxy,
     normalize_lab_target,
 )
-from apps.workers.models import LabAllowlistEntry, LabLoginScan, LogScan, LogScanHit, LogUpload
+from apps.workers.models import (
+    LabAllowlistEntry,
+    LabLoginScan,
+    LabProxyProfile,
+    LogScan,
+    LogScanHit,
+    LogUpload,
+)
 from apps.workers.tasks import run_lab_login_scan_task, run_log_scan_task
 
 
@@ -139,6 +146,7 @@ class LogScanSerializer(serializers.ModelSerializer):
 class LabLoginScanSerializer(serializers.ModelSerializer):
     proxy_configured = serializers.SerializerMethodField()
     proxy_display = serializers.SerializerMethodField()
+    proxy_profile_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LabLoginScan
@@ -149,6 +157,7 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
             "target_url",
             "proxy_configured",
             "proxy_display",
+            "proxy_profile_name",
             "status",
             "candidate_count",
             "attempt_count",
@@ -170,6 +179,21 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
     def get_proxy_display(self, obj) -> str:
         if not obj.proxy_url:
             return ""
+        return lab_proxy_display(decrypt_secret(obj.proxy_url))
+
+    def get_proxy_profile_name(self, obj) -> str:
+        return obj.proxy_profile.name if obj.proxy_profile_id else ""
+
+
+class LabProxyProfileSerializer(serializers.ModelSerializer):
+    proxy_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabProxyProfile
+        fields = ("id", "name", "proxy_display", "is_default", "created_at", "updated_at")
+        read_only_fields = fields
+
+    def get_proxy_display(self, obj) -> str:
         return lab_proxy_display(decrypt_secret(obj.proxy_url))
 
 
@@ -272,6 +296,7 @@ class LabLoginScanCreateSerializer(serializers.Serializer):
         write_only=True,
         trim_whitespace=False,
     )
+    proxy_profile_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     hit_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
@@ -281,6 +306,67 @@ class LabLoginScanCreateSerializer(serializers.Serializer):
 
     def validate_domain(self, value):
         return value.strip().casefold().rstrip(".")
+
+
+class LabProxyProfileCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(min_length=1, max_length=120)
+    proxy_url = serializers.CharField(min_length=2, max_length=2048)
+    proxy_username = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    proxy_password = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=1024,
+        write_only=True,
+        trim_whitespace=False,
+    )
+    is_default = serializers.BooleanField(default=True)
+
+
+class LabProxyProfileViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsStaffUser]
+    serializer_class = LabProxyProfileSerializer
+    http_method_names = ["get", "post", "delete", "head", "options"]
+
+    def get_queryset(self):
+        return LabProxyProfile.objects.filter(owner=self.request.user)
+
+    def list(self, request):
+        rows = self.get_queryset()
+        return Response(LabProxyProfileSerializer(rows, many=True).data)
+
+    def create(self, request):
+        serializer = LabProxyProfileCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        profile_name = data["name"].strip()
+        if not profile_name:
+            return Response({"detail": "Proxy profile name is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if LabProxyProfile.objects.filter(owner=request.user, name=profile_name).exists():
+            return Response({"detail": "A proxy profile with this name already exists."}, status=status.HTTP_409_CONFLICT)
+        try:
+            proxy_url = normalize_lab_proxy(
+                data["proxy_url"],
+                data.get("proxy_username") or "",
+                data.get("proxy_password") or "",
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        profile = LabProxyProfile.objects.create(
+            owner=request.user,
+            name=profile_name,
+            proxy_url=encrypt_secret(proxy_url),
+            is_default=bool(data.get("is_default", True)),
+        )
+        if profile.is_default:
+            LabProxyProfile.objects.filter(owner=request.user).exclude(pk=profile.pk).update(is_default=False)
+        return Response(LabProxyProfileSerializer(profile).data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        profile = self.get_queryset().filter(pk=pk).first()
+        if profile is None:
+            return Response({"detail": "Proxy profile was not found."}, status=status.HTTP_404_NOT_FOUND)
+        profile.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class LogScanHitSerializer(serializers.ModelSerializer):
     password = serializers.SerializerMethodField()
@@ -445,14 +531,30 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             target_url, target_domain = normalize_lab_target(data["target_url"])
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        try:
-            proxy_url = normalize_lab_proxy(
-                data.get("proxy_url") or "",
-                data.get("proxy_username") or "",
-                data.get("proxy_password") or "",
-            )
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        proxy_profile = None
+        profile_id = data.get("proxy_profile_id")
+        if profile_id:
+            proxy_profile = LabProxyProfile.objects.filter(
+                id=profile_id,
+                owner=request.user,
+            ).first()
+            if proxy_profile is None:
+                return Response({"detail": "Saved proxy profile was not found."}, status=status.HTTP_400_BAD_REQUEST)
+            if any(data.get(key) for key in ("proxy_url", "proxy_username", "proxy_password")):
+                return Response(
+                    {"detail": "Choose a saved proxy or enter a new proxy, not both."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            proxy_url = decrypt_secret(proxy_profile.proxy_url)
+        else:
+            try:
+                proxy_url = normalize_lab_proxy(
+                    data.get("proxy_url") or "",
+                    data.get("proxy_username") or "",
+                    data.get("proxy_password") or "",
+                )
+            except ValueError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         requested_ids = list(dict.fromkeys(data.get("hit_ids") or []))
         qs = LogScanHit.objects.filter(scan=scan, domain__iexact=data["domain"])
@@ -470,6 +572,7 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             target_domain=target_domain,
             target_url=target_url,
             proxy_url=encrypt_secret(proxy_url) if proxy_url else "",
+            proxy_profile=proxy_profile,
             hit_ids=[hit.id for hit in hits],
             candidate_count=len(hits),
             created_by=request.user,
@@ -568,7 +671,7 @@ class LabLoginScanViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LabLoginScanSerializer
 
     def _owned_queryset(self):
-        qs = LabLoginScan.objects.select_related("scan").all()
+        qs = LabLoginScan.objects.select_related("scan", "proxy_profile").all()
         if not self.request.user.is_superuser:
             qs = qs.filter(created_by=self.request.user)
         return qs

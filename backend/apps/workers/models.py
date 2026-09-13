@@ -126,6 +126,13 @@ class LabLoginScan(TimeStampedModel):
     # Optional per-job proxy URL, encrypted with apps.core.crypto.encrypt_secret().
     # It is never returned verbatim by the API because it may contain credentials.
     proxy_url = models.TextField(blank=True)
+    proxy_profile = models.ForeignKey(
+        "LabProxyProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="login_scans",
+    )
     hit_ids = models.JSONField(default=list, blank=True)
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.QUEUED, db_index=True
@@ -151,6 +158,31 @@ class LabLoginScan(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"LabLoginScan#{self.pk} {self.target_domain} ({self.status})"
+
+
+class LabProxyProfile(TimeStampedModel):
+    """Encrypted, reusable proxy configuration for lab login checks."""
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lab_proxy_profiles",
+    )
+    name = models.CharField(max_length=120)
+    proxy_url = models.TextField()
+    is_default = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ["-is_default", "name", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "name"],
+                name="workers_labproxyprofile_owner_name_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.owner_id})"
 
 
 class LabAllowlistEntry(TimeStampedModel):

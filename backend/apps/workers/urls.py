@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .log_scan_views import (
     LabAllowlistView,
     LabLoginScanViewSet,
+    LabProxyProfileViewSet,
     LogScanHitViewSet,
     LogScanLimitsView,
     LogScanViewSet,
@@ -18,6 +19,7 @@ router.register(r"logs/uploads", LogUploadViewSet, basename="log-upload")
 router.register(r"logs/scans", LogScanViewSet, basename="log-scan")
 router.register(r"logs/hits", LogScanHitViewSet, basename="log-hit")
 router.register(r"logs/credential-tests", LabLoginScanViewSet, basename="lab-login-scan")
+router.register(r"logs/proxy-profiles", LabProxyProfileViewSet, basename="lab-proxy-profile")
 
 urlpatterns = [
     path("workers/health/", WorkerHealthView.as_view(), name="workers-health"),

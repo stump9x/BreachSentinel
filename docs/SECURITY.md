@@ -39,7 +39,9 @@ Supported proxy schemes are HTTP, HTTPS, SOCKS4 and SOCKS5. Proxy credentials ar
 accepted in separate UI fields, encrypted at rest with `FIELD_ENCRYPTION_KEY`, and
 never returned verbatim by the API or retained in BruteForceAI result records. When
 the stack runs in Docker, use `host.docker.internal` to reach a proxy running on the
-Docker host.
+Docker host. Staff can pin an encrypted proxy profile to their account and reuse it
+without re-entering credentials; history exposes only the proxy endpoint label and
+validated source/exit IP metadata.
 
 ## Still later
 

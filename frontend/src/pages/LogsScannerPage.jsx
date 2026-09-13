@@ -8,6 +8,7 @@ import {
   CircularProgress,
   IconButton,
   LinearProgress,
+  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -163,6 +164,10 @@ export default function LogsScannerPage() {
   const [labProxyUrl, setLabProxyUrl] = useState("");
   const [labProxyUsername, setLabProxyUsername] = useState("");
   const [labProxyPassword, setLabProxyPassword] = useState("");
+  const [labProxyProfiles, setLabProxyProfiles] = useState([]);
+  const [labProxyProfileId, setLabProxyProfileId] = useState("");
+  const [labProxyProfileName, setLabProxyProfileName] = useState("");
+  const [proxyProfileBusy, setProxyProfileBusy] = useState(false);
   const [labJob, setLabJob] = useState(null);
   const [labBusy, setLabBusy] = useState(false);
   const [labAllowlist, setLabAllowlist] = useState([]);
@@ -205,6 +210,13 @@ export default function LogsScannerPage() {
   const loadLabAllowlist = useCallback(async () => {
     const data = await api.get("/api/v1/logs/lab-allowlist/");
     setLabAllowlist(data.results || data || []);
+  }, []);
+
+  const loadLabProxyProfiles = useCallback(async () => {
+    const data = await api.get("/api/v1/logs/proxy-profiles/");
+    const rows = data.results || data || [];
+    setLabProxyProfiles(rows);
+    setLabProxyProfileId((current) => current || String(rows.find((row) => row.is_default)?.id || ""));
   }, []);
 
   const loadLabHistory = useCallback(async () => {
@@ -266,12 +278,17 @@ export default function LogsScannerPage() {
       if (!matchingHits.length) {
         throw new Error("No credential hits match this domain in the current scan.");
       }
+      const proxyPayload = labProxyProfileId
+        ? { proxy_profile_id: Number(labProxyProfileId) }
+        : {
+            proxy_url: labProxyUrl.trim(),
+            proxy_username: labProxyUsername,
+            proxy_password: labProxyPassword,
+          };
       const job = await api.post(`/api/v1/logs/scans/${scan.id}/credential-test/`, {
         domain,
         target_url: targetUrl,
-        proxy_url: labProxyUrl.trim(),
-        proxy_username: labProxyUsername,
-        proxy_password: labProxyPassword,
+        ...proxyPayload,
         hit_ids: matchingHits.map((row) => row.id),
       });
       setLabJob(job);
@@ -282,6 +299,47 @@ export default function LogsScannerPage() {
       setError(err.message || "Failed to start lab verification");
     } finally {
       setLabBusy(false);
+    }
+  };
+
+  const saveLabProxyProfile = async () => {
+    if (!labProxyUrl.trim() || !labProxyProfileName.trim()) return;
+    setProxyProfileBusy(true);
+    setError("");
+    try {
+      const profile = await api.post("/api/v1/logs/proxy-profiles/", {
+        name: labProxyProfileName.trim(),
+        proxy_url: labProxyUrl.trim(),
+        proxy_username: labProxyUsername,
+        proxy_password: labProxyPassword,
+        is_default: true,
+      });
+      await loadLabProxyProfiles();
+      setLabProxyProfileId(String(profile.id));
+      setLabProxyProfileName("");
+      setLabProxyPassword("");
+      setMessage(`Proxy ${profile.name} đã được ghim và mã hóa an toàn.`);
+    } catch (err) {
+      setError(err.message || "Failed to save proxy profile");
+    } finally {
+      setProxyProfileBusy(false);
+    }
+  };
+
+  const deleteLabProxyProfile = async () => {
+    if (!labProxyProfileId) return;
+    const profile = labProxyProfiles.find((row) => String(row.id) === String(labProxyProfileId));
+    if (!window.confirm(`Bỏ proxy đã ghim${profile?.name ? ` ${profile.name}` : ""}?`)) return;
+    setProxyProfileBusy(true);
+    try {
+      await api.delete(`/api/v1/logs/proxy-profiles/${labProxyProfileId}/`);
+      setLabProxyProfileId("");
+      await loadLabProxyProfiles();
+      setMessage("Đã bỏ proxy đã ghim.");
+    } catch (err) {
+      setError(err.message || "Failed to delete proxy profile");
+    } finally {
+      setProxyProfileBusy(false);
     }
   };
 
@@ -453,7 +511,9 @@ export default function LogsScannerPage() {
       label: "Proxy",
       nowrap: false,
       sx: { overflowWrap: "anywhere" },
-      render: (row) => row.proxy_display || row.result_summary?.proxy || "Direct",
+      render: (row) => [row.proxy_profile_name, row.proxy_display || row.result_summary?.proxy]
+        .filter(Boolean)
+        .join(" · ") || "Direct",
     },
     {
       key: "actions",
@@ -484,6 +544,7 @@ export default function LogsScannerPage() {
           loadKept(),
           loadLimits(),
           loadLabAllowlist(),
+          loadLabProxyProfiles(),
           loadLabHistory(),
         ]);
       } catch (err) {
@@ -493,7 +554,7 @@ export default function LogsScannerPage() {
     return () => {
       cancelled = true;
     };
-  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist, loadLabHistory]);
+  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist, loadLabProxyProfiles, loadLabHistory]);
 
   useEffect(() => {
     if (!scan || !ACTIVE.has(scan.status)) return undefined;
@@ -1211,18 +1272,42 @@ export default function LogsScannerPage() {
           />
           <TextField
             size="small"
+            select
+            label="Proxy đã ghim"
+            value={labProxyProfileId}
+            onChange={(event) => {
+              const value = event.target.value;
+              setLabProxyProfileId(value);
+              if (value) {
+                setLabProxyUrl("");
+                setLabProxyUsername("");
+                setLabProxyPassword("");
+              }
+            }}
+            disabled={labBusy || proxyProfileBusy}
+            sx={{ minWidth: 210 }}
+          >
+            <MenuItem value="">Proxy mới / nhập tay</MenuItem>
+            {labProxyProfiles.map((profile) => (
+              <MenuItem key={profile.id} value={String(profile.id)}>
+                {profile.name} · {profile.proxy_display}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            size="small"
             label="Proxy server (optional)"
             placeholder="socks5://proxy.lab:1080"
             value={labProxyUrl}
             onChange={(event) => setLabProxyUrl(event.target.value)}
-            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
+            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy || Boolean(labProxyProfileId)}
           />
           <TextField
             size="small"
             label="Proxy username"
             value={labProxyUsername}
             onChange={(event) => setLabProxyUsername(event.target.value)}
-            disabled={!labProxyUrl.trim() || labBusy}
+            disabled={!labProxyUrl.trim() || labBusy || Boolean(labProxyProfileId)}
             autoComplete="off"
           />
           <TextField
@@ -1231,9 +1316,37 @@ export default function LogsScannerPage() {
             label="Proxy password"
             value={labProxyPassword}
             onChange={(event) => setLabProxyPassword(event.target.value)}
-            disabled={!labProxyUrl.trim() || labBusy}
+            disabled={!labProxyUrl.trim() || labBusy || Boolean(labProxyProfileId)}
             autoComplete="new-password"
           />
+          {!labProxyProfileId ? (
+            <>
+              <TextField
+                size="small"
+                label="Tên proxy ghim"
+                placeholder="VPS proxy chính"
+                value={labProxyProfileName}
+                onChange={(event) => setLabProxyProfileName(event.target.value)}
+                disabled={!labProxyUrl.trim() || proxyProfileBusy}
+              />
+              <Button
+                variant="outlined"
+                onClick={saveLabProxyProfile}
+                disabled={!labProxyUrl.trim() || !labProxyProfileName.trim() || proxyProfileBusy}
+              >
+                {proxyProfileBusy ? <CircularProgress size={18} /> : "Ghim proxy"}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="text"
+              color="error"
+              onClick={deleteLabProxyProfile}
+              disabled={proxyProfileBusy}
+            >
+              Bỏ proxy ghim
+            </Button>
+          )}
           <Button
             variant="contained"
             color="warning"

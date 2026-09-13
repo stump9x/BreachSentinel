@@ -154,6 +154,13 @@ def lab_proxy_display(value: str) -> str:
     return f"{parsed.scheme.casefold()}://{display_host}:{port}"
 
 
+def _safe_external_ip(value) -> str:
+    try:
+        return str(ipaddress.ip_address(str(value or "").strip()))
+    except ValueError:
+        return ""
+
+
 def run_lab_login_scan(job_id: int) -> dict:
     job = LabLoginScan.objects.select_related("scan").get(pk=job_id)
     with transaction.atomic():
@@ -209,6 +216,8 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "success": bool(item.get("success")),
                 "response_time_ms": item.get("response_time_ms"),
                 "timestamp": item.get("timestamp"),
+                "external_ip": _safe_external_ip(item.get("external_ip")),
+                "proxy_server": "configured" if item.get("proxy_server") or proxy_url else "",
             }
             for item in payload.get("results") or []
             if isinstance(item, dict)
