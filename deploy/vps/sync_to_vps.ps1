@@ -20,6 +20,18 @@ function Invoke-Vps([string]$Cmd) {
   if ($LASTEXITCODE -ne 0) { throw "SSH command failed: $Cmd" }
 }
 
+function Copy-ToVps([string]$Source, [string]$Destination) {
+  foreach ($attempt in 1..3) {
+    scp -o BatchMode=yes -o ConnectTimeout=20 $Source "${HostName}:$Destination"
+    if ($LASTEXITCODE -eq 0) { return }
+    if ($attempt -lt 3) {
+      Write-Host "   scp retry $attempt/3 for $Source"
+      Start-Sleep -Seconds 2
+    }
+  }
+  throw "scp failed for $Source after 3 attempts"
+}
+
 Write-Host ">> SSH host: $HostName"
 Invoke-Vps "mkdir -p $RemoteDir"
 
@@ -40,6 +52,7 @@ $pairs = @(
   @{ Local = "backend\apps\workers\services.py"; Remote = "$RemoteDir/backend/apps/workers/" },
   @{ Local = "backend\apps\workers\geography.py"; Remote = "$RemoteDir/backend/apps/workers/" },
   @{ Local = "backend\apps\workers\models.py"; Remote = "$RemoteDir/backend/apps/workers/" },
+  @{ Local = "backend\apps\workers\lab_login_verifier.py"; Remote = "$RemoteDir/backend/apps/workers/" },
   @{ Local = "backend\apps\workers\log_scanner.py"; Remote = "$RemoteDir/backend/apps/workers/" },
   @{ Local = "backend\apps\workers\log_scan_views.py"; Remote = "$RemoteDir/backend/apps/workers/" },
   @{ Local = "backend\apps\workers\urls.py"; Remote = "$RemoteDir/backend/apps/workers/" },
@@ -47,6 +60,9 @@ $pairs = @(
   @{ Local = "backend\apps\workers\admin.py"; Remote = "$RemoteDir/backend/apps/workers/" },
   @{ Local = "backend\apps\workers\migrations\__init__.py"; Remote = "$RemoteDir/backend/apps/workers/migrations/" },
   @{ Local = "backend\apps\workers\migrations\0001_log_scanner.py"; Remote = "$RemoteDir/backend/apps/workers/migrations/" },
+  @{ Local = "backend\apps\workers\migrations\0005_labloginscan_proxy_url.py"; Remote = "$RemoteDir/backend/apps/workers/migrations/" },
+  @{ Local = "backend\apps\workers\tests\__init__.py"; Remote = "$RemoteDir/backend/apps/workers/tests/" },
+  @{ Local = "backend\apps\workers\tests\test_lab_login_proxy.py"; Remote = "$RemoteDir/backend/apps/workers/tests/" },
   @{ Local = "backend\apps\workers\tests\test_log_scanner.py"; Remote = "$RemoteDir/backend/apps/workers/tests/" },
   @{ Local = "backend\apps\workers\tests\test_geography_tags.py"; Remote = "$RemoteDir/backend/apps/workers/tests/" },
   @{ Local = "backend\apps\workers\tests\test_precise_tags.py"; Remote = "$RemoteDir/backend/apps/workers/tests/" },
@@ -65,6 +81,11 @@ $pairs = @(
   @{ Local = "frontend\src\utils\dateTime.test.js"; Remote = "$RemoteDir/frontend/src/utils/" },
   @{ Local = "deploy\vps\sync_groq_keys_from_newscrawler.sh"; Remote = "$RemoteDir/deploy/vps/" },
   @{ Local = "frontend\nginx.conf"; Remote = "$RemoteDir/frontend/" },
+  @{ Local = "services\bruteforceai\main.py"; Remote = "$RemoteDir/services/bruteforceai/" },
+  @{ Local = "services\bruteforceai\bs_multisignal_detector.py"; Remote = "$RemoteDir/services/bruteforceai/" },
+  @{ Local = "services\bruteforceai\patches\bruteforceai-multisignal.patch"; Remote = "$RemoteDir/services/bruteforceai/patches/" },
+  @{ Local = "services\bruteforceai\tests\test_multisignal_detector.py"; Remote = "$RemoteDir/services/bruteforceai/tests/" },
+  @{ Local = "docs\SECURITY.md"; Remote = "$RemoteDir/docs/" },
   @{ Local = "deploy\vps\optimize_vps.sh"; Remote = "$RemoteDir/deploy/vps/" },
   @{ Local = "deploy\vps\deploy.sh"; Remote = "$RemoteDir/deploy/vps/" },
   @{ Local = "deploy\vps\bootstrap_data.sh"; Remote = "$RemoteDir/deploy/vps/" },
@@ -81,8 +102,7 @@ foreach ($p in $pairs) {
     Write-Host "   skip missing $($p.Local)"
     continue
   }
-  scp -o BatchMode=yes $src "${HostName}:$($p.Remote)"
-  if ($LASTEXITCODE -ne 0) { throw "scp failed for $($p.Local)" }
+  Copy-ToVps $src $p.Remote
 }
 
 Invoke-Vps "sed -i 's/\r`$//' $RemoteDir/deploy/vps/*.sh && chmod +x $RemoteDir/deploy/vps/*.sh"

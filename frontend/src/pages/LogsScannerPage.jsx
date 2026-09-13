@@ -161,6 +161,8 @@ export default function LogsScannerPage() {
   const [labDomain, setLabDomain] = useState("");
   const [labTargetUrl, setLabTargetUrl] = useState("");
   const [labProxyUrl, setLabProxyUrl] = useState("");
+  const [labProxyUsername, setLabProxyUsername] = useState("");
+  const [labProxyPassword, setLabProxyPassword] = useState("");
   const [labJob, setLabJob] = useState(null);
   const [labBusy, setLabBusy] = useState(false);
   const [labAllowlist, setLabAllowlist] = useState([]);
@@ -268,9 +270,12 @@ export default function LogsScannerPage() {
         domain,
         target_url: targetUrl,
         proxy_url: labProxyUrl.trim(),
+        proxy_username: labProxyUsername,
+        proxy_password: labProxyPassword,
         hit_ids: matchingHits.map((row) => row.id),
       });
       setLabJob(job);
+      setLabProxyPassword("");
       await loadLabHistory();
       setMessage(`Lab verification queued for ${domain}.`);
     } catch (err) {
@@ -448,7 +453,7 @@ export default function LogsScannerPage() {
       label: "Proxy",
       nowrap: false,
       sx: { overflowWrap: "anywhere" },
-      render: (row) => row.proxy_url || row.result_summary?.proxy_url || "Direct",
+      render: (row) => row.proxy_display || row.result_summary?.proxy || "Direct",
     },
     {
       key: "actions",
@@ -1206,12 +1211,28 @@ export default function LogsScannerPage() {
           />
           <TextField
             size="small"
-            label="HTTP(S) proxy (optional)"
-            placeholder="http://proxy.lab:8080"
+            label="Proxy server (optional)"
+            placeholder="socks5://proxy.lab:1080"
             value={labProxyUrl}
             onChange={(event) => setLabProxyUrl(event.target.value)}
             disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
-            helperText="Do not embed credentials"
+          />
+          <TextField
+            size="small"
+            label="Proxy username"
+            value={labProxyUsername}
+            onChange={(event) => setLabProxyUsername(event.target.value)}
+            disabled={!labProxyUrl.trim() || labBusy}
+            autoComplete="off"
+          />
+          <TextField
+            size="small"
+            type="password"
+            label="Proxy password"
+            value={labProxyPassword}
+            onChange={(event) => setLabProxyPassword(event.target.value)}
+            disabled={!labProxyUrl.trim() || labBusy}
+            autoComplete="new-password"
           />
           <Button
             variant="contained"
@@ -1243,7 +1264,7 @@ export default function LogsScannerPage() {
         {labJob ? (
           <Box sx={{ mt: 1.5 }}>
             <Typography variant="caption" color="text.secondary">
-              Job #{labJob.id} · {labJob.target_url} · {labJob.proxy_url ? `proxy ${labJob.proxy_url} · ` : "direct · "}{labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
+              Job #{labJob.id} · {labJob.target_url} · {labJob.proxy_display ? `proxy ${labJob.proxy_display} · ` : "direct · "}{labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
             </Typography>
             <DataTable columns={labResultColumns} rows={labRows} empty="No result rows yet" />
           </Box>

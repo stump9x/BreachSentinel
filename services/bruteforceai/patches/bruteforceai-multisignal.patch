@@ -2,7 +2,28 @@ diff --git a/BruteForceCore.py b/BruteForceCore.py
 index f399c3d..ae07a7a 100644
 --- a/BruteForceCore.py
 +++ b/BruteForceCore.py
-@@ -1941,90 +1941,55 @@ Return ONLY valid JSON format:
+@@ -484,7 +484,8 @@ class BruteForceAI:
+                     'ignore_https_errors': True  # Ignore SSL certificate errors
+                 }
+                 if self.proxy:
+-                    context_args['proxy'] = {"server": self.proxy}
++                    from bs_multisignal_detector import playwright_proxy_options
++                    context_args['proxy'] = playwright_proxy_options(self.proxy)
+                 
+                 # Add random User-Agent if available
+                 random_user_agent = self._get_random_user_agent()
+@@ -1927,8 +1928,9 @@ Return ONLY valid JSON format:
+                     context_args = {
+                         'ignore_https_errors': True  # Ignore SSL certificate errors
+                     }
+                     if self.proxy:
+-                        context_args['proxy'] = {"server": self.proxy}
++                        from bs_multisignal_detector import playwright_proxy_options
++                        context_args['proxy'] = playwright_proxy_options(self.proxy)
+                     
+                     # Add random User-Agent if available
+                     random_user_agent = self._get_random_user_agent()
+@@ -1941,90 +1943,55 @@ Return ONLY valid JSON format:
                      # Navigate to URL
                      page.goto(url, timeout=30000)
                      page.wait_for_load_state('networkidle')

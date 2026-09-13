@@ -123,7 +123,9 @@ class LabLoginScan(TimeStampedModel):
     scan = models.ForeignKey(LogScan, on_delete=models.CASCADE, related_name="lab_login_scans")
     target_domain = models.CharField(max_length=255, db_index=True)
     target_url = models.URLField(max_length=2048)
-    proxy_url = models.URLField(max_length=2048, blank=True)
+    # Optional per-job proxy URL, encrypted with apps.core.crypto.encrypt_secret().
+    # It is never returned verbatim by the API because it may contain credentials.
+    proxy_url = models.TextField(blank=True)
     hit_ids = models.JSONField(default=list, blank=True)
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.QUEUED, db_index=True

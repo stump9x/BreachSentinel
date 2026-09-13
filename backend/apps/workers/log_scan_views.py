@@ -13,7 +13,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.crypto import decrypt_secret
+from apps.core.crypto import decrypt_secret, encrypt_secret
 from apps.core.permissions import IsStaffUser
 from apps.workers.log_scanner import (
     delete_upload,
@@ -25,6 +25,7 @@ from apps.workers.log_scanner import (
     store_upload_file,
 )
 from apps.workers.lab_login_verifier import (
+    lab_proxy_display,
     normalize_lab_hostname,
     normalize_lab_proxy,
     normalize_lab_target,
@@ -136,6 +137,9 @@ class LogScanSerializer(serializers.ModelSerializer):
 
 
 class LabLoginScanSerializer(serializers.ModelSerializer):
+    proxy_configured = serializers.SerializerMethodField()
+    proxy_display = serializers.SerializerMethodField()
+
     class Meta:
         model = LabLoginScan
         fields = (
@@ -143,7 +147,8 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
             "scan",
             "target_domain",
             "target_url",
-            "proxy_url",
+            "proxy_configured",
+            "proxy_display",
             "status",
             "candidate_count",
             "attempt_count",
@@ -158,6 +163,14 @@ class LabLoginScanSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_proxy_configured(self, obj) -> bool:
+        return bool(obj.proxy_url)
+
+    def get_proxy_display(self, obj) -> str:
+        if not obj.proxy_url:
+            return ""
+        return lab_proxy_display(decrypt_secret(obj.proxy_url))
 
 
 class LabAllowlistCreateSerializer(serializers.Serializer):
@@ -251,6 +264,14 @@ class LabLoginScanCreateSerializer(serializers.Serializer):
     target_url = serializers.CharField(min_length=2, max_length=2048)
     domain = serializers.CharField(min_length=1, max_length=255)
     proxy_url = serializers.CharField(required=False, allow_blank=True, max_length=2048)
+    proxy_username = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    proxy_password = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=1024,
+        write_only=True,
+        trim_whitespace=False,
+    )
     hit_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
@@ -260,13 +281,6 @@ class LabLoginScanCreateSerializer(serializers.Serializer):
 
     def validate_domain(self, value):
         return value.strip().casefold().rstrip(".")
-
-    def validate_proxy_url(self, value):
-        try:
-            return normalize_lab_proxy(value)
-        except ValueError as exc:
-            raise serializers.ValidationError(str(exc)) from exc
-
 
 class LogScanHitSerializer(serializers.ModelSerializer):
     password = serializers.SerializerMethodField()
@@ -431,6 +445,14 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             target_url, target_domain = normalize_lab_target(data["target_url"])
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            proxy_url = normalize_lab_proxy(
+                data.get("proxy_url") or "",
+                data.get("proxy_username") or "",
+                data.get("proxy_password") or "",
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         requested_ids = list(dict.fromkeys(data.get("hit_ids") or []))
         qs = LogScanHit.objects.filter(scan=scan, domain__iexact=data["domain"])
@@ -447,7 +469,7 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             scan=scan,
             target_domain=target_domain,
             target_url=target_url,
-            proxy_url=data.get("proxy_url", ""),
+            proxy_url=encrypt_secret(proxy_url) if proxy_url else "",
             hit_ids=[hit.id for hit in hits],
             candidate_count=len(hits),
             created_by=request.user,

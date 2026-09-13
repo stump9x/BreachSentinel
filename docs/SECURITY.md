@@ -32,6 +32,15 @@ docker compose exec backend python manage.py shell -c "from django.contrib.auth 
 
 Set `REDIS_PASSWORD`, rotate `DJANGO_SECRET_KEY`, optionally `CREDENTIAL_PEPPER` + `FIELD_ENCRYPTION_KEY` in `.env` for production.
 
+### Logs Scanner lab proxy
+
+Staff can configure an optional per-job proxy in the **Lab login verification** panel.
+Supported proxy schemes are HTTP, HTTPS, SOCKS4 and SOCKS5. Proxy credentials are
+accepted in separate UI fields, encrypted at rest with `FIELD_ENCRYPTION_KEY`, and
+never returned verbatim by the API or retained in BruteForceAI result records. When
+the stack runs in Docker, use `host.docker.internal` to reach a proxy running on the
+Docker host.
+
 ## Still later
 
 - Full OIDC/LDAP (env stubs already present)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import ipaddress
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
 from django.conf import settings
@@ -15,6 +15,8 @@ from apps.core.crypto import decrypt_secret
 from apps.workers.models import LabAllowlistEntry, LabLoginScan, LogScanHit
 
 logger = logging.getLogger(__name__)
+
+SUPPORTED_LAB_PROXY_SCHEMES = {"http", "https", "socks4", "socks5"}
 
 
 def _configured_lab_hosts() -> set[str]:
@@ -80,29 +82,76 @@ def normalize_lab_target(value: str) -> tuple[str, str]:
     return raw, host
 
 
-def normalize_lab_proxy(value: str) -> str:
+def normalize_lab_proxy(
+    value: str,
+    username: str = "",
+    password: str = "",
+) -> str:
+    """Validate and normalize an optional browser proxy URL.
+
+    Credentials may be supplied inside the URL or separately by the UI. The
+    returned value is suitable for encrypted storage and is never serialized
+    back to clients verbatim.
+    """
+    raw = (value or "").strip()
+    username = (username or "").strip()
+    password = password or ""
+    if not raw:
+        if username or password:
+            raise ValueError("Enter a proxy server before proxy credentials.")
+        return ""
+    if any(char in raw for char in ("\r", "\n", "\x00")):
+        raise ValueError("Proxy URL contains invalid characters.")
+    if "://" not in raw:
+        raw = f"http://{raw}"
+    parsed = urlsplit(raw)
+    scheme = parsed.scheme.casefold()
+    host = parsed.hostname or ""
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Proxy port must be between 1 and 65535.") from exc
+    if scheme not in SUPPORTED_LAB_PROXY_SCHEMES:
+        supported = ", ".join(sorted(SUPPORTED_LAB_PROXY_SCHEMES))
+        raise ValueError(f"Proxy scheme must be one of: {supported}.")
+    if not host or port is None:
+        raise ValueError("Proxy must include a hostname and port.")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("Proxy URL may not contain a path, query, or fragment.")
+
+    parsed_username = parsed.username or ""
+    parsed_password = parsed.password or ""
+    if username or password:
+        parsed_username = quote(username, safe="")
+        parsed_password = quote(password, safe="")
+    if parsed_password and not parsed_username:
+        raise ValueError("Proxy password requires a proxy username.")
+
+    display_host = f"[{host}]" if ":" in host else host
+    userinfo = ""
+    if parsed_username:
+        userinfo = parsed_username
+        if parsed_password:
+            userinfo += f":{parsed_password}"
+        userinfo += "@"
+    return urlunsplit((scheme, f"{userinfo}{display_host}:{port}", "", "", ""))
+
+
+def lab_proxy_display(value: str) -> str:
+    """Return a credential-free proxy label for API responses and logs."""
     raw = (value or "").strip()
     if not raw:
         return ""
     parsed = urlsplit(raw)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError("Proxy must be an HTTP(S) URL.")
-    if parsed.username or parsed.password:
-        raise ValueError("Proxy credentials may not be embedded in the URL.")
-    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
-        raise ValueError("Proxy must contain only scheme, host, and optional port.")
+    host = parsed.hostname or ""
     try:
-        parsed.port
-    except ValueError as exc:
-        raise ValueError("Proxy URL contains an invalid port.") from exc
-    return f"{parsed.scheme}://{parsed.netloc.rstrip('/')}"
-
-
-def _safe_external_ip(value) -> str:
-    try:
-        return str(ipaddress.ip_address(str(value or "").strip()))
+        port = parsed.port
     except ValueError:
-        return ""
+        return "configured"
+    if not host or port is None:
+        return "configured"
+    display_host = f"[{host}]" if ":" in host else host
+    return f"{parsed.scheme.casefold()}://{display_host}:{port}"
 
 
 def run_lab_login_scan(job_id: int) -> dict:
@@ -139,6 +188,7 @@ def run_lab_login_scan(job_id: int) -> dict:
 
     url = str(getattr(settings, "BRUTEFORCEAI_SERVICE_URL", "") or "").rstrip("/") + "/scan"
     token = str(getattr(settings, "BRUTEFORCEAI_INTERNAL_TOKEN", "") or "")
+    proxy_url = decrypt_secret(job.proxy_url or "")
     try:
         response = httpx.post(
             url,
@@ -146,7 +196,7 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "target_url": job.target_url,
                 "credentials": credentials,
                 "allowed_hosts": sorted(get_lab_allowlisted_hosts()),
-                "proxy_url": job.proxy_url or None,
+                "proxy_url": proxy_url or None,
             },
             headers={"X-BruteForceAI-Token": token},
             timeout=1800.0,
@@ -159,8 +209,6 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "success": bool(item.get("success")),
                 "response_time_ms": item.get("response_time_ms"),
                 "timestamp": item.get("timestamp"),
-                "external_ip": _safe_external_ip(item.get("external_ip")),
-                "proxy_server": job.proxy_url or "",
             }
             for item in payload.get("results") or []
             if isinstance(item, dict)
@@ -170,7 +218,7 @@ def run_lab_login_scan(job_id: int) -> dict:
         service_status = str(payload.get("status") or "failed")
         job.result_summary = {
             "target_domain": job.target_domain,
-            "proxy_url": job.proxy_url or "",
+            "proxy": lab_proxy_display(proxy_url),
             "service_status": service_status,
             "reason_code": str(payload.get("reason_code") or ""),
             "analysis": payload.get("analysis") or {},

@@ -18,13 +18,15 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 from urllib.request import ProxyHandler, build_opener
 
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
+
+from bs_multisignal_detector import playwright_proxy_options
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("bruteforceai-wrapper")
@@ -79,18 +81,23 @@ def _normalize_proxy_url(value: str | None) -> str | None:
     raw = str(value or "").strip()
     if not raw:
         return None
+    if any(char in raw for char in ("\r", "\n", "\x00")):
+        raise ValueError("proxy_url contains invalid characters")
+    if "://" not in raw:
+        raw = f"http://{raw}"
     parsed = urlsplit(raw)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError("proxy_url must be an HTTP(S) proxy URL")
-    if parsed.username or parsed.password:
-        raise ValueError("proxy_url may not contain embedded credentials")
+    if parsed.scheme.casefold() not in {"http", "https", "socks4", "socks5"} or not parsed.hostname:
+        raise ValueError("proxy_url must use HTTP, HTTPS, SOCKS4 or SOCKS5")
     if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
         raise ValueError("proxy_url must contain only scheme, host, and optional port")
     try:
-        parsed.port
+        port = parsed.port
     except ValueError as exc:
         raise ValueError("proxy_url contains an invalid port") from exc
-    return f"{parsed.scheme}://{parsed.netloc.rstrip('/')}"
+    if port is None:
+        raise ValueError("proxy_url must include a port")
+    playwright_proxy_options(raw)
+    return raw
 
 
 class Credential(BaseModel):
@@ -166,6 +173,10 @@ def _redact_database() -> None:
     try:
         with sqlite3.connect(DATABASE) as connection:
             connection.execute("UPDATE brute_force_attempts SET password='[redacted]'")
+            connection.execute(
+                "UPDATE brute_force_attempts SET proxy_server='[configured]' "
+                "WHERE proxy_server IS NOT NULL AND proxy_server != ''"
+            )
             connection.commit()
     except sqlite3.Error:
         logger.exception("Could not redact upstream SQLite attempt records")
@@ -267,7 +278,11 @@ def _safe_output(output: str, request: ScanRequest) -> str:
     if LLM_API_KEY:
         safe = safe.replace(LLM_API_KEY, "[redacted]")
     if request.proxy_url:
-        safe = safe.replace(request.proxy_url, "[proxy]")
+        safe = safe.replace(request.proxy_url, "[proxy redacted]")
+        parsed = urlsplit(request.proxy_url)
+        for secret_value in (parsed.username, parsed.password):
+            if secret_value:
+                safe = safe.replace(unquote(secret_value), "[redacted]")
     return safe[-4000:]
 
 
@@ -360,7 +375,7 @@ def _fallback_browser_analysis(target_url: str, proxy_url: str | None = None) ->
                 browser = playwright.chromium.launch(headless=not SHOW_BROWSER)
                 context_args = {"ignore_https_errors": True}
                 if proxy_url:
-                    context_args["proxy"] = {"server": proxy_url}
+                    context_args["proxy"] = playwright_proxy_options(proxy_url)
                 context = browser.new_context(**context_args)
                 page = context.new_page()
                 page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
@@ -599,7 +614,7 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
                     "results": results,
                 }
             if request.proxy_url:
-                result["proxy_server"] = request.proxy_url
+                result["proxy_server"] = "configured"
                 # Do not report the host IP as a proxy exit IP when the proxy probe fails.
                 result["external_ip"] = proxy_external_ip
             results.append(result)

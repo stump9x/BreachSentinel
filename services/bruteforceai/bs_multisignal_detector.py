@@ -12,7 +12,32 @@ import os
 import re
 import time
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
+
+
+SUPPORTED_PROXY_SCHEMES = {"http", "https", "socks4", "socks5"}
+
+
+def playwright_proxy_options(proxy_url: str) -> dict[str, str]:
+    """Convert a proxy URL into Playwright's separate server/auth fields."""
+    parsed = urlsplit((proxy_url or "").strip())
+    scheme = parsed.scheme.casefold()
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Proxy port must be between 1 and 65535.") from exc
+    if scheme not in SUPPORTED_PROXY_SCHEMES or not parsed.hostname or port is None:
+        raise ValueError("Invalid HTTP(S), SOCKS4, or SOCKS5 proxy URL.")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("Proxy URL may not contain a path, query, or fragment.")
+
+    host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+    options = {"server": f"{scheme}://{host}:{port}"}
+    if parsed.username:
+        options["username"] = unquote(parsed.username)
+    if parsed.password:
+        options["password"] = unquote(parsed.password)
+    return options
 
 
 SUCCESS_TERMS = (

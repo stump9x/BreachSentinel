@@ -1,4 +1,8 @@
-from bs_multisignal_detector import PageSnapshot, evaluate_snapshots
+from bs_multisignal_detector import (
+    PageSnapshot,
+    evaluate_snapshots,
+    playwright_proxy_options,
+)
 
 
 def snapshot(**overrides):
@@ -88,3 +92,25 @@ def test_success_text_and_disappeared_form_succeed():
     )
     assert result.success is True
     assert result.signals["login_form_disappeared"] is True
+
+
+def test_proxy_options_keep_auth_out_of_server_url():
+    assert playwright_proxy_options(
+        "http://proxy-user:p%40ss@proxy.internal:8080"
+    ) == {
+        "server": "http://proxy.internal:8080",
+        "username": "proxy-user",
+        "password": "p@ss",
+    }
+
+
+def test_proxy_options_support_socks_and_reject_paths():
+    assert playwright_proxy_options("socks5://127.0.0.1:1080") == {
+        "server": "socks5://127.0.0.1:1080"
+    }
+    try:
+        playwright_proxy_options("http://proxy.internal:8080/not-a-proxy-path")
+    except ValueError as exc:
+        assert "path" in str(exc)
+    else:
+        raise AssertionError("Proxy URLs with paths must be rejected")
