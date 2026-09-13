@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.utils.dateparse import parse_date
 from rest_framework import serializers, status, viewsets
@@ -333,6 +334,17 @@ class LabProxyProfileViewSet(viewsets.GenericViewSet):
     def list(self, request):
         rows = self.get_queryset()
         return Response(LabProxyProfileSerializer(rows, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="set-default")
+    def set_default(self, request, pk=None):
+        profile = self.get_queryset().filter(pk=pk).first()
+        if profile is None:
+            return Response({"detail": "Proxy profile was not found."}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            self.get_queryset().update(is_default=False)
+            profile.is_default = True
+            profile.save(update_fields=["is_default", "updated_at"])
+        return Response(LabProxyProfileSerializer(profile).data)
 
     def create(self, request):
         serializer = LabProxyProfileCreateSerializer(data=request.data)

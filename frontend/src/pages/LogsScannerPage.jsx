@@ -21,6 +21,8 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import StarIcon from "@mui/icons-material/Star";
 import { api, buildQuery } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { DataTable } from "../components/DataTable";
@@ -364,6 +366,25 @@ export default function LogsScannerPage() {
       setMessage("Đã bỏ proxy đã ghim.");
     } catch (err) {
       setError(err.message || "Failed to delete proxy profile");
+    } finally {
+      setProxyProfileBusy(false);
+    }
+  };
+
+  const setDefaultLabProxyProfile = async (profileId) => {
+    if (!profileId) return;
+    setProxyProfileBusy(true);
+    setError("");
+    try {
+      const profile = await api.post(`/api/v1/logs/proxy-profiles/${profileId}/set-default/`, {});
+      setLabProxyProfiles((current) => current.map((row) => ({
+        ...row,
+        is_default: String(row.id) === String(profile.id),
+      })));
+      setLabProxyProfileId(String(profile.id));
+      setMessage(`Đã đặt ${profile.name} làm proxy mặc định.`);
+    } catch (err) {
+      setError(err.message || "Failed to set default proxy");
     } finally {
       setProxyProfileBusy(false);
     }
@@ -1369,6 +1390,18 @@ export default function LogsScannerPage() {
                         {profile.proxy_display}
                       </Typography>
                     </Box>
+                    <IconButton
+                      size="small"
+                      color={profile.is_default ? "warning" : "default"}
+                      title={profile.is_default ? "Proxy mặc định" : "Đặt làm proxy mặc định"}
+                      disabled={proxyProfileBusy || labBusy || profile.is_default}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDefaultLabProxyProfile(profile.id);
+                      }}
+                    >
+                      {profile.is_default ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+                    </IconButton>
                     <IconButton
                       size="small"
                       color="error"
