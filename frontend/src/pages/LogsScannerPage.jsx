@@ -173,7 +173,10 @@ export default function LogsScannerPage() {
   const [labProxyProfileName, setLabProxyProfileName] = useState("");
   const [proxyProfileBusy, setProxyProfileBusy] = useState(false);
   const [proxyEditorOpen, setProxyEditorOpen] = useState(false);
+  const [labSelectedDomains, setLabSelectedDomains] = useState([]);
+  const [labTargetUrls, setLabTargetUrls] = useState({});
   const [labJob, setLabJob] = useState(null);
+  const [labJobs, setLabJobs] = useState([]);
   const [labBusy, setLabBusy] = useState(false);
   const [labAllowlist, setLabAllowlist] = useState([]);
   const [allowlistBusy, setAllowlistBusy] = useState(false);
@@ -273,6 +276,29 @@ export default function LogsScannerPage() {
     return [...values].sort();
   }, [hits]);
 
+  useEffect(() => {
+    const available = new Set(labDomains);
+    setLabSelectedDomains((current) => current.filter((domain) => available.has(domain)));
+    setLabTargetUrls((current) => Object.fromEntries(
+      Object.entries(current).filter(([domain]) => available.has(domain))
+    ));
+  }, [labDomains]);
+
+  const toggleLabDomain = (domain) => {
+    setLabSelectedDomains((current) => (
+      current.includes(domain)
+        ? current.filter((item) => item !== domain)
+        : [...current, domain]
+    ));
+    setLabDomain(domain);
+  };
+
+  const toggleAllLabDomains = () => {
+    setLabSelectedDomains((current) => (
+      current.length === labDomains.length ? [] : [...labDomains]
+    ));
+  };
+
   const labRows = useMemo(
     () => (labJob?.result_summary?.results || []).map((row, index) => ({
       ...row,
@@ -283,21 +309,23 @@ export default function LogsScannerPage() {
   );
 
   const startLabVerification = async () => {
-    if (!scan?.id || !labDomain.trim()) return;
+    if (!scan?.id || !labSelectedDomains.length) return;
     setLabBusy(true);
     setError("");
     setMessage("");
     try {
-      const domain = labDomain.trim().toLowerCase().replace(/\.$/, "");
-      const targetUrl = labTargetUrl.trim() || `http://${domain}/`;
-      const matchingHits = hits
-        .filter((row) => {
-          const rowDomain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
-          return rowDomain === domain;
-        })
-        .slice(0, 20);
-      if (!matchingHits.length) {
-        throw new Error("No credential hits match this domain in the current scan.");
+      const targets = labSelectedDomains.map((domain) => ({
+        domain,
+        target_url: labSelectedDomains.length === 1 && labTargetUrl.trim()
+          ? labTargetUrl.trim()
+          : (labTargetUrls[domain] || `http://${domain}/`),
+        hit_ids: hits
+          .filter((row) => String(row.domain || "").trim().toLowerCase().replace(/\.$/, "") === domain)
+          .slice(0, 20)
+          .map((row) => row.id),
+      }));
+      if (targets.some((target) => !target.hit_ids.length)) {
+        throw new Error("One or more selected domains have no credential hits.");
       }
       const proxyPayload = labProxyProfileId
         ? { proxy_profile_id: Number(labProxyProfileId) }
@@ -306,16 +334,16 @@ export default function LogsScannerPage() {
             proxy_username: labProxyUsername,
             proxy_password: labProxyPassword,
           };
-      const job = await api.post(`/api/v1/logs/scans/${scan.id}/credential-test/`, {
-        domain,
-        target_url: targetUrl,
+      const result = await api.post(`/api/v1/logs/scans/${scan.id}/credential-test-batch/`, {
+        targets,
         ...proxyPayload,
-        hit_ids: matchingHits.map((row) => row.id),
       });
-      setLabJob(job);
+      const jobs = result.jobs || [];
+      setLabJobs(jobs);
+      setLabJob(jobs[0] || null);
       setLabProxyPassword("");
       await loadLabHistory();
-      setMessage(`Lab verification queued for ${domain}.`);
+      setMessage(`Đã xếp hàng kiểm thử ${jobs.length} domain trong một lần bấm.`);
     } catch (err) {
       setError(err.message || "Failed to start lab verification");
     } finally {
@@ -434,6 +462,7 @@ export default function LogsScannerPage() {
     try {
       await api.delete(`/api/v1/logs/credential-tests/${row.id}/`);
       setLabHistory((current) => current.filter((item) => item.id !== row.id));
+      setLabJobs((current) => current.filter((item) => item.id !== row.id));
       if (labJob?.id === row.id) setLabJob(null);
       setMessage(`Login history job #${row.id} was deleted.`);
     } catch (err) {
@@ -452,6 +481,7 @@ export default function LogsScannerPage() {
     try {
       const result = await api.delete("/api/v1/logs/credential-tests/clear/");
       await loadLabHistory();
+      setLabJobs([]);
       if (labJob && !ACTIVE.has(labJob.status)) setLabJob(null);
       setMessage(`${result?.deleted || 0} login history item(s) deleted.`);
     } catch (err) {
@@ -634,27 +664,33 @@ export default function LogsScannerPage() {
   }, [scan, loadHits]);
 
   useEffect(() => {
-    if (!labJob?.id || !ACTIVE.has(labJob.status)) return undefined;
+    const activeJobs = labJobs.filter((job) => ACTIVE.has(job.status));
+    if (!activeJobs.length) return undefined;
     const timer = setInterval(async () => {
       try {
-        const latest = await api.get(`/api/v1/logs/credential-tests/${labJob.id}/`);
-        setLabJob(latest);
-        if (!ACTIVE.has(latest.status)) {
+        const latestJobs = await Promise.all(
+          activeJobs.map((job) => api.get(`/api/v1/logs/credential-tests/${job.id}/`))
+        );
+        setLabJobs((current) => current.map((job) => (
+          latestJobs.find((latest) => latest.id === job.id) || job
+        )));
+        setLabJob((current) => {
+          const latest = latestJobs.find((item) => item.id === current?.id);
+          return latest || current;
+        });
+        if (latestJobs.some((latest) => !ACTIVE.has(latest.status))) {
           await loadLabHistory();
-          if (latest.status === "failed" || latest.status === "not_attempted") {
-            setError(latest.error_message || "Lab verification failed");
-          } else {
-            setMessage(
-              `Lab verification finished: ${latest.success_count || 0} successful login(s).`
-            );
-          }
+          const finished = latestJobs.filter((latest) => !ACTIVE.has(latest.status));
+          const failed = finished.find((latest) => latest.status === "failed" || latest.status === "not_attempted");
+          if (failed) setError(failed.error_message || "Lab verification failed");
+          else setMessage(`Đã hoàn tất ${finished.length} job kiểm thử login.`);
         }
       } catch (err) {
         setError(err.message || "Lab verification poll failed");
       }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [labJob?.id, labJob?.status, loadLabHistory]);
+  }, [labJobs, loadLabHistory]);
 
   const allSelected = uploads.length > 0 && selectedIds.size === uploads.length;
 
@@ -1311,7 +1347,7 @@ export default function LogsScannerPage() {
           <Button
             variant="outlined"
             size="small"
-            disabled={!labDomain.trim() || allowlistBusy || ACTIVE.has(labJob?.status)}
+            disabled={!labDomain.trim() || allowlistBusy || labJobs.some((job) => ACTIVE.has(job.status))}
             onClick={addLabAllowlist}
           >
             {allowlistBusy ? <CircularProgress size={18} /> : "Add to allowlist"}
@@ -1322,8 +1358,59 @@ export default function LogsScannerPage() {
             placeholder="http://app.test/login"
             value={labTargetUrl}
             onChange={(event) => setLabTargetUrl(event.target.value)}
-            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
+            helperText={labSelectedDomains.length > 1 ? "Chỉ dùng khi chọn đúng 1 domain; nhiều domain sẽ dùng URL mặc định." : ""}
+            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy || labSelectedDomains.length > 1}
           />
+          <Paper
+            variant="outlined"
+            sx={{ flex: "1 1 100%", p: 1.25, borderRadius: 2, bgcolor: "background.default" }}
+          >
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} justifyContent="space-between">
+              <Box>
+                <Typography variant="subtitle2">Domains từ scan đã quét</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Tích chọn nhiều domain rồi bấm Verify một lần. Đã chọn {labSelectedDomains.length}/{labDomains.length}.
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={0.75}>
+                <Button size="small" onClick={toggleAllLabDomains} disabled={!labDomains.length || labBusy}>
+                  {labSelectedDomains.length === labDomains.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                </Button>
+                <Button size="small" onClick={() => setLabSelectedDomains([])} disabled={!labSelectedDomains.length || labBusy}>
+                  Bỏ chọn
+                </Button>
+              </Stack>
+            </Stack>
+            <Stack spacing={0.25} sx={{ mt: 0.75, maxHeight: 180, overflowY: "auto" }}>
+              {labDomains.map((domain) => {
+                const selected = labSelectedDomains.includes(domain);
+                const credentialCount = hits.filter((row) => String(row.domain || "").trim().toLowerCase().replace(/\.$/, "") === domain).length;
+                return (
+                  <Stack
+                    key={domain}
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    sx={{ px: 0.5, borderRadius: 1, cursor: "pointer", bgcolor: selected ? "action.selected" : "transparent", "&:hover": { bgcolor: "action.hover" } }}
+                    onClick={() => toggleLabDomain(domain)}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={selected}
+                      disabled={labBusy}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={() => toggleLabDomain(domain)}
+                    />
+                    <Typography variant="body2" sx={{ flex: 1 }}>{domain}</Typography>
+                    <Chip size="small" label={`${credentialCount} credential`} variant="outlined" />
+                  </Stack>
+                );
+              })}
+              {!labDomains.length ? (
+                <Typography variant="caption" color="text.secondary">Chưa có domain trong scan hiện tại.</Typography>
+              ) : null}
+            </Stack>
+          </Paper>
           <Paper
             variant="outlined"
             sx={{ flex: "1 1 100%", p: 1.25, borderRadius: 2, bgcolor: "background.default" }}
@@ -1357,6 +1444,7 @@ export default function LogsScannerPage() {
                   size="small"
                   checked={!labProxyProfileId}
                   disabled={labBusy || proxyProfileBusy}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={() => selectLabProxyProfile("")}
                 />
                 <Box sx={{ minWidth: 0 }}>
@@ -1379,6 +1467,7 @@ export default function LogsScannerPage() {
                       size="small"
                       checked={selected}
                       disabled={labBusy || proxyProfileBusy}
+                      onClick={(event) => event.stopPropagation()}
                       onChange={() => selectLabProxyProfile(profile.id)}
                     />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1482,10 +1571,12 @@ export default function LogsScannerPage() {
           <Button
             variant="contained"
             color="warning"
-            disabled={!scan || ACTIVE.has(scan.status) || !labDomain.trim() || labBusy}
+            disabled={!scan || ACTIVE.has(scan.status) || !labSelectedDomains.length || labBusy}
             onClick={startLabVerification}
           >
-            {labBusy || ACTIVE.has(labJob?.status) ? <CircularProgress size={18} color="inherit" /> : "Verify in lab"}
+            {labBusy || labJobs.some((job) => ACTIVE.has(job.status))
+              ? <CircularProgress size={18} color="inherit" />
+              : `Verify ${labSelectedDomains.length || "selected"} domain${labSelectedDomains.length === 1 ? "" : "s"}`}
           </Button>
         </Stack>
         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1.25 }} alignItems="center">
@@ -1511,6 +1602,20 @@ export default function LogsScannerPage() {
             <Typography variant="caption" color="text.secondary">
               Job #{labJob.id} · {labJob.target_url} · {labJob.proxy_display ? `proxy ${labJob.proxy_display} · ` : "direct · "}{labJob.status} · {labJob.attempt_count || 0} attempt(s) · {labJob.success_count || 0} success(es)
             </Typography>
+            {labJobs.length > 1 ? (
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+                {labJobs.map((job) => (
+                  <Chip
+                    key={job.id}
+                    size="small"
+                    label={`${job.target_domain} · ${job.status}`}
+                    color={job.status === "completed" && job.success_count ? "success" : ACTIVE.has(job.status) ? "warning" : "default"}
+                    variant={job.id === labJob.id ? "filled" : "outlined"}
+                    onClick={() => setLabJob(job)}
+                  />
+                ))}
+              </Stack>
+            ) : null}
             <DataTable columns={labResultColumns} rows={labRows} empty="No result rows yet" />
           </Box>
         ) : null}

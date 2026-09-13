@@ -309,6 +309,34 @@ class LabLoginScanCreateSerializer(serializers.Serializer):
         return value.strip().casefold().rstrip(".")
 
 
+class LabLoginBatchTargetSerializer(serializers.Serializer):
+    domain = serializers.CharField(min_length=1, max_length=255)
+    target_url = serializers.CharField(required=False, allow_blank=True, max_length=2048)
+    hit_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+        max_length=20,
+    )
+
+    def validate_domain(self, value):
+        return value.strip().casefold().rstrip(".")
+
+
+class LabLoginBatchCreateSerializer(serializers.Serializer):
+    targets = LabLoginBatchTargetSerializer(many=True, allow_empty=False, max_length=10)
+    proxy_url = serializers.CharField(required=False, allow_blank=True, max_length=2048)
+    proxy_username = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    proxy_password = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=1024,
+        write_only=True,
+        trim_whitespace=False,
+    )
+    proxy_profile_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+
+
 class LabProxyProfileCreateSerializer(serializers.Serializer):
     name = serializers.CharField(min_length=1, max_length=120)
     proxy_url = serializers.CharField(min_length=2, max_length=2048)
@@ -592,6 +620,100 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
         task = run_lab_login_scan_task.delay(job.id)
         return Response(
             {**LabLoginScanSerializer(job).data, "task_id": task.id},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="credential-test-batch")
+    def credential_test_batch(self, request, pk=None):
+        """Queue guarded login checks for several domains from one scan."""
+        scan = self.get_object()
+        serializer = LabLoginBatchCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        targets = data["targets"]
+        seen_domains = set()
+        prepared = []
+        for target in targets:
+            domain = target["domain"]
+            if domain in seen_domains:
+                return Response(
+                    {"detail": f"Duplicate domain in batch: {domain}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            seen_domains.add(domain)
+            raw_target_url = (target.get("target_url") or domain).strip()
+            try:
+                target_url, target_domain = normalize_lab_target(raw_target_url)
+            except ValueError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+            if target_domain != domain:
+                return Response(
+                    {"detail": f"Target URL host must match domain {domain}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            requested_ids = list(dict.fromkeys(target.get("hit_ids") or []))
+            qs = LogScanHit.objects.filter(scan=scan, domain__iexact=domain)
+            if requested_ids:
+                qs = qs.filter(id__in=requested_ids)
+            hits = list(qs.order_by("id")[:20])
+            if not hits:
+                return Response(
+                    {"detail": f"No credential hits match domain {domain}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            prepared.append((target_url, target_domain, hits))
+
+        proxy_profile = None
+        profile_id = data.get("proxy_profile_id")
+        if profile_id:
+            proxy_profile = LabProxyProfile.objects.filter(
+                id=profile_id,
+                owner=request.user,
+            ).first()
+            if proxy_profile is None:
+                return Response(
+                    {"detail": "Saved proxy profile was not found."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if any(data.get(key) for key in ("proxy_url", "proxy_username", "proxy_password")):
+                return Response(
+                    {"detail": "Choose a saved proxy or enter a new proxy, not both."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            proxy_url = decrypt_secret(proxy_profile.proxy_url)
+        else:
+            try:
+                proxy_url = normalize_lab_proxy(
+                    data.get("proxy_url") or "",
+                    data.get("proxy_username") or "",
+                    data.get("proxy_password") or "",
+                )
+            except ValueError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            jobs = [
+                LabLoginScan.objects.create(
+                    scan=scan,
+                    target_domain=target_domain,
+                    target_url=target_url,
+                    proxy_url=encrypt_secret(proxy_url) if proxy_url else "",
+                    proxy_profile=proxy_profile,
+                    hit_ids=[hit.id for hit in hits],
+                    candidate_count=len(hits),
+                    created_by=request.user,
+                )
+                for target_url, target_domain, hits in prepared
+            ]
+        task_ids = [run_lab_login_scan_task.delay(job.id).id for job in jobs]
+        return Response(
+            {
+                "count": len(jobs),
+                "jobs": [LabLoginScanSerializer(job).data for job in jobs],
+                "task_ids": task_ids,
+            },
             status=status.HTTP_202_ACCEPTED,
         )
 
