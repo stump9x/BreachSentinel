@@ -165,7 +165,9 @@ export default function LogsScannerPage() {
   const [labProxyUsername, setLabProxyUsername] = useState("");
   const [labProxyPassword, setLabProxyPassword] = useState("");
   const [labProxyProfiles, setLabProxyProfiles] = useState([]);
-  const [labProxyProfileId, setLabProxyProfileId] = useState("");
+  // null means the initial default has not been resolved yet; an empty string
+  // is an explicit user choice to run directly without a proxy.
+  const [labProxyProfileId, setLabProxyProfileId] = useState(null);
   const [labProxyProfileName, setLabProxyProfileName] = useState("");
   const [proxyProfileBusy, setProxyProfileBusy] = useState(false);
   const [proxyEditorOpen, setProxyEditorOpen] = useState(false);
@@ -215,9 +217,14 @@ export default function LogsScannerPage() {
 
   const loadLabProxyProfiles = useCallback(async () => {
     const data = await api.get("/api/v1/logs/proxy-profiles/");
-    const rows = data.results || data || [];
+    const rows = Array.isArray(data) ? data : (data.results || []);
     setLabProxyProfiles(rows);
-    setLabProxyProfileId((current) => current || String(rows.find((row) => row.is_default)?.id || ""));
+    setLabProxyProfileId((current) => (
+      current === null
+        ? String(rows.find((row) => row.is_default)?.id || "")
+        : current
+    ));
+    return rows;
   }, []);
 
   const selectLabProxyProfile = (profileId) => {
@@ -326,7 +333,10 @@ export default function LogsScannerPage() {
         proxy_password: labProxyPassword,
         is_default: true,
       });
-      await loadLabProxyProfiles();
+      setLabProxyProfiles((current) => [
+        profile,
+        ...current.filter((row) => String(row.id) !== String(profile.id)),
+      ].map((row, index) => ({ ...row, is_default: index === 0 })));
       setLabProxyProfileId(String(profile.id));
       setLabProxyUrl("");
       setLabProxyUsername("");
@@ -349,6 +359,7 @@ export default function LogsScannerPage() {
     try {
       await api.delete(`/api/v1/logs/proxy-profiles/${profileId}/`);
       if (String(profileId) === String(labProxyProfileId)) setLabProxyProfileId("");
+      setLabProxyProfiles((current) => current.filter((row) => String(row.id) !== String(profileId)));
       await loadLabProxyProfiles();
       setMessage("Đã bỏ proxy đã ghim.");
     } catch (err) {
