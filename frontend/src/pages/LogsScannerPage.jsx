@@ -1040,7 +1040,33 @@ export default function LogsScannerPage() {
         label: "URL",
         nowrap: false,
         sx: { overflowWrap: "anywhere" },
-        render: (row) => row.url || row.domain || "—",
+        render: (row) => {
+          let domain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
+          if (!domain) {
+            try {
+              domain = new URL(row.url || "").hostname.toLowerCase().replace(/\.$/, "");
+            } catch {
+              domain = "";
+            }
+          }
+          const selected = domain && labSelectedDomains.includes(domain);
+          return (
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              {domain ? (
+                <Checkbox
+                  size="small"
+                  checked={Boolean(selected)}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={() => toggleLabDomain(domain)}
+                  title={`Chọn domain ${domain} để kiểm thử`}
+                />
+              ) : null}
+              <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+                {row.url || row.domain || "—"}
+              </Typography>
+            </Stack>
+          );
+        },
       },
       {
         key: "username",
@@ -1057,7 +1083,7 @@ export default function LogsScannerPage() {
         render: (row) => row.password || "—",
       },
     ],
-    []
+    [labSelectedDomains]
   );
 
   const keptColumns = useMemo(
@@ -1326,7 +1352,7 @@ export default function LogsScannerPage() {
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ md: "center" }}>
+        <Stack direction="column" spacing={1.5}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2">Lab login verification</Typography>
             <Typography variant="caption" color="text.secondary">
