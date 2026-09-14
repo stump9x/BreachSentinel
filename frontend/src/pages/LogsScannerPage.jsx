@@ -184,6 +184,7 @@ export default function LogsScannerPage() {
   const [labHistory, setLabHistory] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
+  const labVerifySubmittingRef = useRef(false);
 
   const loadUploads = useCallback(async () => {
     const data = await api.get(
@@ -364,10 +365,17 @@ export default function LogsScannerPage() {
   );
 
   const startLabVerification = async () => {
-    if (!selectedIds.size || !labSelectedDomains.length) {
+    if (labVerifySubmittingRef.current) return;
+    const selectedDomains = [...new Set(
+      labSelectedDomains
+        .map((domain) => String(domain || "").trim().toLowerCase().replace(/\.$/, ""))
+        .filter(Boolean)
+    )];
+    if (!selectedIds.size || !selectedDomains.length) {
       setError("Hãy chọn ít nhất một file logs và một domain trước khi verify.");
       return;
     }
+    labVerifySubmittingRef.current = true;
     setLabBusy(true);
     setError("");
     setMessage("");
@@ -376,7 +384,7 @@ export default function LogsScannerPage() {
       const selectedUploadIds = [...selectedIds].map(Number);
       const selectedUploadSet = new Set(selectedUploadIds.map(String));
       const sourceScanIds = [...new Set(
-        labSelectedDomains
+        selectedDomains
           .map((domain) => optionByDomain.get(domain)?.scan_id)
           .filter(Boolean)
           .map(String)
@@ -391,7 +399,7 @@ export default function LogsScannerPage() {
         return sourceUploads.size === selectedUploadSet.size
           && [...sourceUploads].every((id) => selectedUploadSet.has(id));
       };
-      const domainsNeedingScan = labSelectedDomains.filter((domain) => {
+      const domainsNeedingScan = selectedDomains.filter((domain) => {
         const option = optionByDomain.get(domain);
         return !option?.scan_id || !matchesSelectedFiles(sourceScans.get(String(option.scan_id)));
       });
@@ -425,12 +433,12 @@ export default function LogsScannerPage() {
       }
 
       const groupedTargets = new Map();
-      labSelectedDomains.forEach((domain) => {
+      selectedDomains.forEach((domain) => {
         const option = optionByDomain.get(domain);
         if (!option?.scan_id) throw new Error(`Không tìm thấy scan nguồn cho domain ${domain}.`);
         const target = {
           domain,
-          target_url: labSelectedDomains.length === 1 && labTargetUrl.trim()
+          target_url: selectedDomains.length === 1 && labTargetUrl.trim()
             ? labTargetUrl.trim()
             : (labTargetUrls[domain] || `http://${domain}/`),
         };
@@ -456,12 +464,13 @@ export default function LogsScannerPage() {
       setLabJob(jobs[0] || null);
       setLabProxyPassword("");
       await loadLabHistory();
-      setMessage(`Đã xếp hàng kiểm thử ${jobs.length} domain trong một lần bấm.`);
+      setMessage(`Đã xếp hàng kiểm thử ${selectedDomains.length} domain trong một lần bấm.`);
     } catch (err) {
       setError(err.message || "Failed to start lab verification");
     } finally {
       setBusyScan(false);
       setLabBusy(false);
+      labVerifySubmittingRef.current = false;
     }
   };
 
