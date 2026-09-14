@@ -12,6 +12,7 @@ import {
   Stack,
   TextField,
   Typography,
+  MenuItem,
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
@@ -154,6 +155,7 @@ export default function LogsScannerPage() {
   const [busyScan, setBusyScan] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [warning, setWarning] = useState("");
   const [maxUploadBytes, setMaxUploadBytes] = useState(DEFAULT_MAX_UPLOAD_BYTES);
   const [uploadProgress, setUploadProgress] = useState({ files: [] });
   const [scan, setScan] = useState(null);
@@ -380,15 +382,26 @@ export default function LogsScannerPage() {
     setLabBusy(true);
     setError("");
     setMessage("");
+    setWarning("");
     // The queue panel represents only the current batch; older attempts stay in history.
     setLabJobs([]);
     setLabJob(null);
     try {
       const optionByDomain = new Map(labDomainOptions.map((row) => [row.domain, row]));
+      const allowlistedHosts = new Set(labAllowlist.map((entry) => (
+        String(entry.host || "").trim().toLowerCase().replace(/\.$/, "")
+      )).filter(Boolean));
+      const skippedDomains = selectedDomains.filter((domain) => !allowlistedHosts.has(domain));
+      const verifiableDomains = selectedDomains.filter((domain) => allowlistedHosts.has(domain));
+      if (!verifiableDomains.length) {
+        setLabDomain(skippedDomains[0] || selectedDomains[0] || "");
+        setWarning("Các domain đã chọn chưa có trong Allowlist nên chưa có domain nào được verify.");
+        return;
+      }
       const selectedUploadIds = [...selectedIds].map(Number);
       const selectedUploadSet = new Set(selectedUploadIds.map(String));
       const sourceScanIds = [...new Set(
-        selectedDomains
+        verifiableDomains
           .map((domain) => optionByDomain.get(domain)?.scan_id)
           .filter(Boolean)
           .map(String)
@@ -413,7 +426,7 @@ export default function LogsScannerPage() {
         return sourceUploads.size === selectedUploadSet.size
           && [...sourceUploads].every((id) => selectedUploadSet.has(id));
       };
-      const domainsNeedingScan = selectedDomains.filter((domain) => {
+      const domainsNeedingScan = verifiableDomains.filter((domain) => {
         const option = optionByDomain.get(domain);
         return !option?.scan_id || !matchesSelectedFiles(sourceScans.get(String(option.scan_id)));
       });
@@ -446,15 +459,15 @@ export default function LogsScannerPage() {
         await loadLabDomainHistory();
       }
 
-      await Promise.all(selectedDomains.map(async (domain) => {
+      await Promise.all(verifiableDomains.map(async (domain) => {
         const option = optionByDomain.get(domain);
         if (option?.scan_id) await loadSourceHits(option.scan_id, domain);
       }));
       const groupedTargets = new Map();
-      selectedDomains.forEach((domain) => {
+      verifiableDomains.forEach((domain) => {
         const option = optionByDomain.get(domain);
         if (!option?.scan_id) throw new Error(`Không tìm thấy scan nguồn cho domain ${domain}.`);
-        const targetUrl = selectedDomains.length === 1 && labTargetUrl.trim()
+        const targetUrl = verifiableDomains.length === 1 && labTargetUrl.trim()
           ? labTargetUrl.trim()
           : (labTargetUrls[domain] || `http://${domain}/`);
         const rows = sourceHits.get(`${option.scan_id}:${domain}`);
@@ -501,7 +514,11 @@ export default function LogsScannerPage() {
       setLabJob(jobs[0] || null);
       setLabProxyPassword("");
       await loadLabHistory();
-      setMessage(`Đã xếp hàng ${jobs.length} credential thuộc ${selectedDomains.length} domain.`);
+      setMessage(`Đã xếp hàng ${jobs.length} credential thuộc ${verifiableDomains.length} domain.`);
+      if (skippedDomains.length) {
+        setLabDomain(skippedDomains[0]);
+        setWarning(`Đã bỏ qua ${skippedDomains.length} domain chưa có trong Allowlist: ${skippedDomains.join(", ")}. Bạn có thể thêm từng domain rồi verify lại.`);
+      }
     } catch (err) {
       setError(err.message || "Failed to start lab verification");
     } finally {
@@ -1303,6 +1320,11 @@ export default function LogsScannerPage() {
           {message}
         </Alert>
       ) : null}
+      {warning ? (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setWarning("")}>
+          {warning}
+        </Alert>
+      ) : null}
 
       <Stack
         direction={{ xs: "column", md: "row" }}
@@ -1517,18 +1539,24 @@ export default function LogsScannerPage() {
           <TextField
             size="small"
             label="Domain from scan"
+            select
             value={labDomain}
             onChange={(event) => setLabDomain(event.target.value)}
-            inputProps={{ list: "logs-scanner-lab-domains" }}
             disabled={labBusy || allowlistBusy}
-          />
-          <datalist id="logs-scanner-lab-domains">
-            {labDomainOptions.map((row) => <option key={row.domain} value={row.domain} />)}
-          </datalist>
+            SelectProps={{ displayEmpty: true }}
+          >
+            <MenuItem value=""><em>Chọn domain đã scan</em></MenuItem>
+            {labDomainOptions.map((row) => (
+              <MenuItem key={row.domain} value={row.domain}>{row.domain}</MenuItem>
+            ))}
+          </TextField>
           <Button
             variant="outlined"
             size="small"
-            disabled={!labDomain.trim() || allowlistBusy || labJobs.some((job) => ACTIVE.has(job.status))}
+            disabled={!labDomain.trim() || labAllowlist.some((entry) => (
+              String(entry.host || "").trim().toLowerCase().replace(/\.$/, "")
+                === labDomain.trim().toLowerCase().replace(/\.$/, "")
+            )) || allowlistBusy || labJobs.some((job) => ACTIVE.has(job.status))}
             onClick={addLabAllowlist}
           >
             {allowlistBusy ? <CircularProgress size={18} /> : "Add to allowlist"}
