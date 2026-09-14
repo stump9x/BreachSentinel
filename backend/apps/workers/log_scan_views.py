@@ -6,7 +6,7 @@ import uuid
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Max, OuterRef, Q, Subquery
+from django.db.models import Max, OuterRef, Q, Subquery
 from django.utils.dateparse import parse_date
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -424,24 +424,31 @@ class LabDomainHistoryView(APIView):
         rows = (
             qs.values("domain")
             .annotate(
-                hit_count=Count("id"),
                 latest_scanned_at=Max("scan__created_at"),
                 latest_scan_id=Subquery(latest_scan),
             )
             .order_by("-latest_scanned_at", "domain")[:10]
         )
-        return Response(
-            [
+        payload = []
+        for row in rows:
+            raw_domain = str(row["domain"] or "").strip()
+            if not raw_domain or not row["latest_scan_id"]:
+                continue
+            # Count only credentials from the scan represented by this row;
+            # counting the whole domain history was misleading in the UI.
+            hit_count = qs.filter(
+                domain=raw_domain,
+                scan_id=row["latest_scan_id"],
+            ).count()
+            payload.append(
                 {
-                    "domain": str(row["domain"]).strip().casefold().rstrip("."),
-                    "hit_count": row["hit_count"],
+                    "domain": raw_domain.casefold().rstrip("."),
+                    "hit_count": hit_count,
                     "latest_scan_id": row["latest_scan_id"],
                     "latest_scanned_at": row["latest_scanned_at"],
                 }
-                for row in rows
-                if str(row["domain"] or "").strip()
-            ]
-        )
+            )
+        return Response(payload)
 
 class LogScanHitSerializer(serializers.ModelSerializer):
     password = serializers.SerializerMethodField()
