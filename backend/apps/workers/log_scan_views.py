@@ -792,6 +792,9 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(is_kept=True)
         elif kept in {"0", "false", "False"}:
             qs = qs.filter(is_kept=False)
+        domain = (request.query_params.get("domain") or "").strip().casefold().rstrip(".")
+        if domain:
+            qs = qs.filter(domain__iexact=domain)
 
         page = self.paginate_queryset(qs)
         if page is not None:

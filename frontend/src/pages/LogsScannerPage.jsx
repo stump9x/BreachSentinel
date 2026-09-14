@@ -397,10 +397,11 @@ export default function LogsScannerPage() {
       )));
       const sourceScans = new Map(sourceScanRows);
       const sourceHits = new Map();
-      const loadSourceHits = async (scanId) => {
-        const key = String(scanId);
+      const loadSourceHits = async (scanId, domain) => {
+        const normalizedDomain = String(domain || "").trim().toLowerCase().replace(/\.$/, "");
+        const key = `${scanId}:${normalizedDomain}`;
         if (!sourceHits.has(key)) {
-          const data = await api.get(`/api/v1/logs/scans/${scanId}/hits/${buildQuery({ page_size: 200 })}`);
+          const data = await api.get(`/api/v1/logs/scans/${scanId}/hits/${buildQuery({ page_size: 200, domain: normalizedDomain })}`);
           sourceHits.set(key, data.results || data || []);
         }
         return sourceHits.get(key);
@@ -446,7 +447,7 @@ export default function LogsScannerPage() {
 
       await Promise.all(selectedDomains.map(async (domain) => {
         const option = optionByDomain.get(domain);
-        if (option?.scan_id) await loadSourceHits(option.scan_id);
+        if (option?.scan_id) await loadSourceHits(option.scan_id, domain);
       }));
       const groupedTargets = new Map();
       selectedDomains.forEach((domain) => {
@@ -455,7 +456,7 @@ export default function LogsScannerPage() {
         const targetUrl = selectedDomains.length === 1 && labTargetUrl.trim()
           ? labTargetUrl.trim()
           : (labTargetUrls[domain] || `http://${domain}/`);
-        const rows = sourceHits.get(String(option.scan_id));
+        const rows = sourceHits.get(`${option.scan_id}:${domain}`);
         if (!rows) throw new Error(`Không tải được credential của domain ${domain}.`);
         const domainHits = rows.filter((row) => {
           let rowDomain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
