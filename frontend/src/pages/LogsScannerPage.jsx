@@ -364,28 +364,6 @@ export default function LogsScannerPage() {
     [labJob]
   );
 
-  const labHistoryDisplay = useMemo(() => {
-    const seenDomains = new Set();
-    return [...labHistory]
-      .sort((a, b) => {
-        const timeDiff = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        return timeDiff || Number(b.id || 0) - Number(a.id || 0);
-      })
-      .filter((row) => {
-        let domain = String(row.target_domain || "").trim().toLowerCase().replace(/\.$/, "");
-        if (!domain) {
-          try {
-            domain = new URL(row.target_url || "").hostname.toLowerCase().replace(/\.$/, "");
-          } catch {
-            domain = "";
-          }
-        }
-        if (!domain || seenDomains.has(domain)) return false;
-        seenDomains.add(domain);
-        return true;
-      });
-  }, [labHistory]);
-
   const startLabVerification = async () => {
     if (labVerifySubmittingRef.current) return;
     const selectedDomains = [...new Set(
@@ -418,6 +396,15 @@ export default function LogsScannerPage() {
         [scanId, await api.get(`/api/v1/logs/scans/${scanId}/`)]
       )));
       const sourceScans = new Map(sourceScanRows);
+      const sourceHits = new Map();
+      const loadSourceHits = async (scanId) => {
+        const key = String(scanId);
+        if (!sourceHits.has(key)) {
+          const data = await api.get(`/api/v1/logs/scans/${scanId}/hits/${buildQuery({ page_size: 200 })}`);
+          sourceHits.set(key, data.results || data || []);
+        }
+        return sourceHits.get(key);
+      };
       const matchesSelectedFiles = (source) => {
         if (!source || source.status !== "completed") return false;
         const sourceUploads = new Set((source.upload_ids || []).map(String));
@@ -457,18 +444,37 @@ export default function LogsScannerPage() {
         await loadLabDomainHistory();
       }
 
+      await Promise.all(selectedDomains.map(async (domain) => {
+        const option = optionByDomain.get(domain);
+        if (option?.scan_id) await loadSourceHits(option.scan_id);
+      }));
       const groupedTargets = new Map();
       selectedDomains.forEach((domain) => {
         const option = optionByDomain.get(domain);
         if (!option?.scan_id) throw new Error(`Không tìm thấy scan nguồn cho domain ${domain}.`);
-        const target = {
-          domain,
-          target_url: selectedDomains.length === 1 && labTargetUrl.trim()
-            ? labTargetUrl.trim()
-            : (labTargetUrls[domain] || `http://${domain}/`),
-        };
+        const targetUrl = selectedDomains.length === 1 && labTargetUrl.trim()
+          ? labTargetUrl.trim()
+          : (labTargetUrls[domain] || `http://${domain}/`);
+        const rows = sourceHits.get(String(option.scan_id));
+        if (!rows) throw new Error(`Không tải được credential của domain ${domain}.`);
+        const domainHits = rows.filter((row) => {
+          let rowDomain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
+          if (!rowDomain) {
+            try {
+              rowDomain = new URL(row.url || "").hostname.toLowerCase().replace(/\.$/, "");
+            } catch {
+              rowDomain = "";
+            }
+          }
+          return rowDomain === domain
+            && String(row.password || "")
+            && String(row.email || row.username || "").trim();
+        });
+        if (!domainHits.length) throw new Error(`Không có credential hợp lệ cho domain ${domain}.`);
         const group = groupedTargets.get(String(option.scan_id)) || [];
-        group.push(target);
+        domainHits.slice(0, 20).forEach((hit) => {
+          group.push({ domain, target_url: targetUrl, hit_ids: [hit.id] });
+        });
         groupedTargets.set(String(option.scan_id), group);
       });
       const proxyPayload = labProxyProfileId
@@ -478,18 +484,22 @@ export default function LogsScannerPage() {
             proxy_username: labProxyUsername,
             proxy_password: labProxyPassword,
           };
-      const results = await Promise.all(
-        [...groupedTargets.entries()].map(([scanId, targets]) => api.post(
-          `/api/v1/logs/scans/${scanId}/credential-test-batch/`,
-          { targets, ...proxyPayload }
-        ))
-      );
+      const requests = [];
+      [...groupedTargets.entries()].forEach(([scanId, targets]) => {
+        for (let index = 0; index < targets.length; index += 10) {
+          requests.push(api.post(
+            `/api/v1/logs/scans/${scanId}/credential-test-batch/`,
+            { targets: targets.slice(index, index + 10), ...proxyPayload }
+          ));
+        }
+      });
+      const results = await Promise.all(requests);
       const jobs = results.flatMap((result) => result.jobs || []);
       setLabJobs(jobs);
       setLabJob(jobs[0] || null);
       setLabProxyPassword("");
       await loadLabHistory();
-      setMessage(`Đã xếp hàng kiểm thử ${selectedDomains.length} domain trong một lần bấm.`);
+      setMessage(`Đã xếp hàng ${jobs.length} credential thuộc ${selectedDomains.length} domain.`);
     } catch (err) {
       setError(err.message || "Failed to start lab verification");
     } finally {
@@ -1807,8 +1817,8 @@ export default function LogsScannerPage() {
               >
                 {historyExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
               </IconButton>
-              <Typography variant="subtitle2">Login attempt history · latest per domain</Typography>
-              <Chip size="small" label={String(labHistoryDisplay.length)} />
+              <Typography variant="subtitle2">Login attempt history</Typography>
+              <Chip size="small" label={String(labHistory.length)} />
             </Stack>
             {historyExpanded ? <Stack direction="row" spacing={1}>
               <Button
@@ -1825,8 +1835,8 @@ export default function LogsScannerPage() {
           {historyExpanded ? (
             <DataTable
               columns={labHistoryColumns}
-              rows={labHistoryDisplay}
-              loading={historyBusy && !labHistoryDisplay.length}
+              rows={labHistory}
+              loading={historyBusy && !labHistory.length}
               empty="No login history yet"
             />
           ) : null}

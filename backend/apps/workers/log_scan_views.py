@@ -674,16 +674,27 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
         data = serializer.validated_data
 
         targets = data["targets"]
-        seen_domains = set()
+        seen_domains_without_hits = set()
+        seen_hit_ids = set()
         prepared = []
         for target in targets:
             domain = target["domain"]
-            if domain in seen_domains:
+            requested_ids = list(dict.fromkeys(target.get("hit_ids") or []))
+            if not requested_ids and domain in seen_domains_without_hits:
                 return Response(
                     {"detail": f"Duplicate domain in batch: {domain}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            seen_domains.add(domain)
+            if requested_ids:
+                overlap = seen_hit_ids.intersection(requested_ids)
+                if overlap:
+                    return Response(
+                        {"detail": f"Duplicate credential in batch for domain {domain}."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                seen_hit_ids.update(requested_ids)
+            else:
+                seen_domains_without_hits.add(domain)
             raw_target_url = (target.get("target_url") or domain).strip()
             try:
                 target_url, target_domain = normalize_lab_target(raw_target_url)
@@ -695,7 +706,6 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            requested_ids = list(dict.fromkeys(target.get("hit_ids") or []))
             qs = LogScanHit.objects.filter(scan=scan, domain__iexact=domain)
             if requested_ids:
                 qs = qs.filter(id__in=requested_ids)
