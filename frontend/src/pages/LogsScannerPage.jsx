@@ -310,7 +310,13 @@ export default function LogsScannerPage() {
         latest_scanned_at: scan?.completed_at || scan?.created_at,
       });
     });
-    return [...options.values()].filter((row) => row.domain).sort((a, b) => a.domain.localeCompare(b.domain));
+    return [...options.values()]
+      .filter((row) => row.domain)
+      .sort((a, b) => {
+        const timeDiff = new Date(b.latest_scanned_at || 0).getTime() - new Date(a.latest_scanned_at || 0).getTime();
+        return timeDiff || a.domain.localeCompare(b.domain);
+      })
+      .slice(0, 10);
   }, [labDomainHistory, labDomains, hits, scan?.id, scan?.completed_at, scan?.created_at]);
 
   useEffect(() => {
@@ -1437,7 +1443,7 @@ export default function LogsScannerPage() {
               <Box>
                 <Typography variant="subtitle2">Domains từ scan đã quét</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Tích chọn domain từ lịch sử scan rồi bấm Verify một lần. Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
+                  10 domain scan gần nhất, mới nhất xếp trên. Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
                 </Typography>
               </Box>
               <Stack direction="row" spacing={0.75}>
