@@ -126,7 +126,10 @@ services:
         condition: service_started
       bruteforceai:
         condition: service_healthy
-    command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --max-memory-per-child=300000
+    # Local/dev fallback: consume both the normal integration queue and the
+    # dedicated log-scan queue.  The VPS overlay splits these queues into
+    # separate workers for predictable scan latency.
+    command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1} --max-memory-per-child=300000 -Q celery,log_scans
 
   celery-beat:
     image: breachsentinel-backend:latest

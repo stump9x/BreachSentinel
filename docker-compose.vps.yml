@@ -75,7 +75,65 @@ services:
       - newscrawler_net
     command: >
       celery -A config worker -l info
+      -Q celery
       --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
+      --max-tasks-per-child=${CELERY_MAX_TASKS_PER_CHILD:-100}
+      --max-memory-per-child=${CELERY_MAX_MEMORY_PER_CHILD_KB:-450000}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 10 | grep -q pong",
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+  # User-triggered log scans must not wait behind scheduled RSS/Searx jobs.
+  # This worker is intentionally isolated from the normal integration queue.
+  celery-log-scan:
+    image: breachsentinel-backend:latest
+    container_name: bs-celery-log-scan
+    restart: unless-stopped
+    mem_limit: ${CELERY_LOG_SCAN_MEM_LIMIT:-512m}
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-breachsentinel-redis}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-breachsentinel-redis}@redis:6379/1
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      BRUTEFORCEAI_SERVICE_URL: http://bruteforceai:8000
+      BRUTEFORCEAI_INTERNAL_TOKEN: ${BRUTEFORCEAI_INTERNAL_TOKEN:-}
+      TOR_ENABLED: ${TOR_ENABLED:-true}
+      TOR_SOCKS_PROXY: ${TOR_SOCKS_PROXY:-socks5h://tor:9150}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      searxng:
+        condition: service_started
+      bruteforceai:
+        condition: service_healthy
+    init: true
+    stop_grace_period: 45s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - newscrawler_net
+    command: >
+      celery -A config worker -l info
+      -Q log_scans
+      --concurrency=${LOG_SCAN_WORKER_CONCURRENCY:-1}
       --max-tasks-per-child=${CELERY_MAX_TASKS_PER_CHILD:-100}
       --max-memory-per-child=${CELERY_MAX_MEMORY_PER_CHILD_KB:-450000}
     healthcheck:

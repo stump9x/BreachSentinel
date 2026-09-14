@@ -208,6 +208,13 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 60 * 15
 CELERY_TASK_SOFT_TIME_LIMIT = 60 * 10
+# Keep log scanning on its own queue so scheduled integrations cannot leave a
+# user-facing scan in QUEUED for an arbitrary amount of time.  The VPS runs a
+# dedicated worker for this queue; the local worker consumes both queues.
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+CELERY_TASK_ROUTES = {
+    "workers.run_log_scan": {"queue": "log_scans"},
+}
 # Prefer fair scheduling so long RSS sweeps do not starve translate/Searx tasks.
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Drop Celery result keys automatically (Redis DB 1) — safe memory hygiene.
