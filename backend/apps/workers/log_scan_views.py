@@ -695,7 +695,26 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
                 seen_hit_ids.update(requested_ids)
             else:
                 seen_domains_without_hits.add(domain)
-            raw_target_url = (target.get("target_url") or domain).strip()
+            raw_target_url = (target.get("target_url") or "").strip()
+            qs = LogScanHit.objects.filter(scan=scan, domain__iexact=domain)
+            if requested_ids:
+                qs = qs.filter(id__in=requested_ids)
+            hits = list(qs.order_by("id")[:20])
+            if not hits:
+                return Response(
+                    {"detail": f"No credential hits match domain {domain}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            # When the caller does not override the target, use the complete
+            # URL attached to the selected credential instead of collapsing it
+            # to the domain root. This preserves login paths from the scan.
+            if not raw_target_url:
+                raw_target_url = str(hits[0].url or "").strip()
+            if not raw_target_url:
+                return Response(
+                    {"detail": f"Credential for {domain} has no complete target URL."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             try:
                 target_url, target_domain = normalize_lab_target(raw_target_url)
             except ValueError as exc:
@@ -706,15 +725,6 @@ class LogScanViewSet(viewsets.ReadOnlyModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            qs = LogScanHit.objects.filter(scan=scan, domain__iexact=domain)
-            if requested_ids:
-                qs = qs.filter(id__in=requested_ids)
-            hits = list(qs.order_by("id")[:20])
-            if not hits:
-                return Response(
-                    {"detail": f"No credential hits match domain {domain}."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             prepared.append((target_url, target_domain, hits))
 
         proxy_profile = None

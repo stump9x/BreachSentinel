@@ -176,7 +176,6 @@ export default function LogsScannerPage() {
   const [proxyProfileBusy, setProxyProfileBusy] = useState(false);
   const [proxyEditorOpen, setProxyEditorOpen] = useState(false);
   const [labSelectedDomains, setLabSelectedDomains] = useState([]);
-  const [labTargetUrls, setLabTargetUrls] = useState({});
   const [labDomainHistory, setLabDomainHistory] = useState([]);
   const [labJob, setLabJob] = useState(null);
   const [labJobs, setLabJobs] = useState([]);
@@ -340,9 +339,6 @@ export default function LogsScannerPage() {
   useEffect(() => {
     const available = new Set(labDomainOptions.map((row) => row.domain));
     setLabSelectedDomains((current) => current.filter((domain) => available.has(domain)));
-    setLabTargetUrls((current) => Object.fromEntries(
-      Object.entries(current).filter(([domain]) => available.has(domain))
-    ));
   }, [labDomainOptions]);
 
   const toggleLabDomain = (domain) => {
@@ -469,9 +465,7 @@ export default function LogsScannerPage() {
       verifiableDomains.forEach((domain) => {
         const option = optionByDomain.get(domain);
         if (!option?.scan_id) throw new Error(`Không tìm thấy scan nguồn cho domain ${domain}.`);
-        const targetUrl = verifiableDomains.length === 1 && labTargetUrl.trim()
-          ? labTargetUrl.trim()
-          : (labTargetUrls[domain] || `http://${domain}/`);
+        const manualTargetUrl = verifiableDomains.length === 1 ? labTargetUrl.trim() : "";
         const rows = sourceHits.get(`${option.scan_id}:${domain}`);
         if (!rows) throw new Error(`Không tải được credential của domain ${domain}.`);
         const domainHits = rows.filter((row) => {
@@ -489,9 +483,25 @@ export default function LogsScannerPage() {
         });
         if (!domainHits.length) throw new Error(`Không có credential hợp lệ cho domain ${domain}.`);
         const group = groupedTargets.get(String(option.scan_id)) || [];
+        let domainTargetCount = 0;
         domainHits.slice(0, 20).forEach((hit) => {
+          const scannedTargetUrl = String(hit.url || "").trim();
+          const targetUrl = manualTargetUrl || scannedTargetUrl;
+          if (!targetUrl) return;
+          if (!manualTargetUrl) {
+            try {
+              const parsed = new URL(scannedTargetUrl);
+              if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname) return;
+            } catch {
+              return;
+            }
+          }
+          domainTargetCount += 1;
           group.push({ domain, target_url: targetUrl, hit_ids: [hit.id] });
         });
+        if (!domainTargetCount) {
+          throw new Error(`Domain ${domain} không có URL HTTP(S) đầy đủ trong kết quả scan.`);
+        }
         groupedTargets.set(String(option.scan_id), group);
       });
       const proxyPayload = labProxyProfileId
@@ -1609,7 +1619,9 @@ export default function LogsScannerPage() {
             placeholder="http://app.test/login"
             value={labTargetUrl}
             onChange={(event) => setLabTargetUrl(event.target.value)}
-            helperText={labSelectedDomains.length > 1 ? "Chỉ dùng khi chọn đúng 1 domain; nhiều domain sẽ dùng URL mặc định." : ""}
+            helperText={labSelectedDomains.length > 1
+              ? "Chỉ dùng khi chọn đúng 1 domain; mặc định mỗi credential dùng URL đầy đủ từ kết quả scan."
+              : "Để trống để dùng URL đầy đủ tương ứng trong kết quả scan; nhập URL để ghi đè thủ công."}
             disabled={labBusy || allowlistBusy || labSelectedDomains.length > 1}
           />
           <Paper
