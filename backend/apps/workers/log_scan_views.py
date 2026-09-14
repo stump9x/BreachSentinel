@@ -6,7 +6,7 @@ import uuid
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Max, OuterRef, Q, Subquery
 from django.utils.dateparse import parse_date
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -407,6 +407,41 @@ class LabProxyProfileViewSet(viewsets.GenericViewSet):
             return Response({"detail": "Proxy profile was not found."}, status=status.HTTP_404_NOT_FOUND)
         profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LabDomainHistoryView(APIView):
+    """Return distinct domains found across the user's completed log scans."""
+
+    permission_classes = [IsStaffUser]
+
+    def get(self, request):
+        qs = LogScanHit.objects.filter(domain__isnull=False).exclude(domain="")
+        if not request.user.is_superuser:
+            qs = qs.filter(scan__created_by=request.user)
+        latest_scan = qs.filter(domain=OuterRef("domain")).order_by(
+            "-scan__created_at", "-id"
+        ).values("scan_id")[:1]
+        rows = (
+            qs.values("domain")
+            .annotate(
+                hit_count=Count("id"),
+                latest_scanned_at=Max("scan__created_at"),
+                latest_scan_id=Subquery(latest_scan),
+            )
+            .order_by("-latest_scanned_at", "domain")[:500]
+        )
+        return Response(
+            [
+                {
+                    "domain": str(row["domain"]).strip().casefold().rstrip("."),
+                    "hit_count": row["hit_count"],
+                    "latest_scan_id": row["latest_scan_id"],
+                    "latest_scanned_at": row["latest_scanned_at"],
+                }
+                for row in rows
+                if str(row["domain"] or "").strip()
+            ]
+        )
 
 class LogScanHitSerializer(serializers.ModelSerializer):
     password = serializers.SerializerMethodField()

@@ -175,6 +175,7 @@ export default function LogsScannerPage() {
   const [proxyEditorOpen, setProxyEditorOpen] = useState(false);
   const [labSelectedDomains, setLabSelectedDomains] = useState([]);
   const [labTargetUrls, setLabTargetUrls] = useState({});
+  const [labDomainHistory, setLabDomainHistory] = useState([]);
   const [labJob, setLabJob] = useState(null);
   const [labJobs, setLabJobs] = useState([]);
   const [labBusy, setLabBusy] = useState(false);
@@ -218,6 +219,11 @@ export default function LogsScannerPage() {
   const loadLabAllowlist = useCallback(async () => {
     const data = await api.get("/api/v1/logs/lab-allowlist/");
     setLabAllowlist(data.results || data || []);
+  }, []);
+
+  const loadLabDomainHistory = useCallback(async () => {
+    const data = await api.get("/api/v1/logs/domains/");
+    setLabDomainHistory(Array.isArray(data) ? data : (data.results || []));
   }, []);
 
   const loadLabProxyProfiles = useCallback(async () => {
@@ -276,13 +282,44 @@ export default function LogsScannerPage() {
     return [...values].sort();
   }, [hits]);
 
+  const labDomainOptions = useMemo(() => {
+    const options = new Map(
+      labDomainHistory.map((row) => [String(row.domain || "").trim().toLowerCase().replace(/\.$/, ""), {
+        domain: String(row.domain || "").trim().toLowerCase().replace(/\.$/, ""),
+        hit_count: Number(row.hit_count) || 0,
+        scan_id: row.latest_scan_id,
+        latest_scanned_at: row.latest_scanned_at,
+      }])
+    );
+    labDomains.forEach((domain) => {
+      const hitCount = hits.filter((row) => {
+        let rowDomain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
+        if (!rowDomain) {
+          try {
+            rowDomain = new URL(row.url || "").hostname.toLowerCase().replace(/\.$/, "");
+          } catch {
+            rowDomain = "";
+          }
+        }
+        return rowDomain === domain;
+      }).length;
+      options.set(domain, {
+        domain,
+        hit_count: hitCount,
+        scan_id: scan?.id,
+        latest_scanned_at: scan?.completed_at || scan?.created_at,
+      });
+    });
+    return [...options.values()].filter((row) => row.domain).sort((a, b) => a.domain.localeCompare(b.domain));
+  }, [labDomainHistory, labDomains, hits, scan?.id, scan?.completed_at, scan?.created_at]);
+
   useEffect(() => {
-    const available = new Set(labDomains);
+    const available = new Set(labDomainOptions.map((row) => row.domain));
     setLabSelectedDomains((current) => current.filter((domain) => available.has(domain)));
     setLabTargetUrls((current) => Object.fromEntries(
       Object.entries(current).filter(([domain]) => available.has(domain))
     ));
-  }, [labDomains]);
+  }, [labDomainOptions]);
 
   const toggleLabDomain = (domain) => {
     setLabSelectedDomains((current) => (
@@ -295,7 +332,7 @@ export default function LogsScannerPage() {
 
   const toggleAllLabDomains = () => {
     setLabSelectedDomains((current) => (
-      current.length === labDomains.length ? [] : [...labDomains]
+      current.length === labDomainOptions.length ? [] : labDomainOptions.map((row) => row.domain)
     ));
   };
 
@@ -314,19 +351,21 @@ export default function LogsScannerPage() {
     setError("");
     setMessage("");
     try {
-      const targets = labSelectedDomains.map((domain) => ({
-        domain,
-        target_url: labSelectedDomains.length === 1 && labTargetUrl.trim()
-          ? labTargetUrl.trim()
-          : (labTargetUrls[domain] || `http://${domain}/`),
-        hit_ids: hits
-          .filter((row) => String(row.domain || "").trim().toLowerCase().replace(/\.$/, "") === domain)
-          .slice(0, 20)
-          .map((row) => row.id),
-      }));
-      if (targets.some((target) => !target.hit_ids.length)) {
-        throw new Error("One or more selected domains have no credential hits.");
-      }
+      const optionByDomain = new Map(labDomainOptions.map((row) => [row.domain, row]));
+      const groupedTargets = new Map();
+      labSelectedDomains.forEach((domain) => {
+        const option = optionByDomain.get(domain);
+        if (!option?.scan_id) throw new Error(`Không tìm thấy scan nguồn cho domain ${domain}.`);
+        const target = {
+          domain,
+          target_url: labSelectedDomains.length === 1 && labTargetUrl.trim()
+            ? labTargetUrl.trim()
+            : (labTargetUrls[domain] || `http://${domain}/`),
+        };
+        const group = groupedTargets.get(String(option.scan_id)) || [];
+        group.push(target);
+        groupedTargets.set(String(option.scan_id), group);
+      });
       const proxyPayload = labProxyProfileId
         ? { proxy_profile_id: Number(labProxyProfileId) }
         : {
@@ -334,11 +373,13 @@ export default function LogsScannerPage() {
             proxy_username: labProxyUsername,
             proxy_password: labProxyPassword,
           };
-      const result = await api.post(`/api/v1/logs/scans/${scan.id}/credential-test-batch/`, {
-        targets,
-        ...proxyPayload,
-      });
-      const jobs = result.jobs || [];
+      const results = await Promise.all(
+        [...groupedTargets.entries()].map(([scanId, targets]) => api.post(
+          `/api/v1/logs/scans/${scanId}/credential-test-batch/`,
+          { targets, ...proxyPayload }
+        ))
+      );
+      const jobs = results.flatMap((result) => result.jobs || []);
       setLabJobs(jobs);
       setLabJob(jobs[0] || null);
       setLabProxyPassword("");
@@ -628,6 +669,7 @@ export default function LogsScannerPage() {
           loadKept(),
           loadLimits(),
           loadLabAllowlist(),
+          loadLabDomainHistory(),
           loadLabProxyProfiles(),
           loadLabHistory(),
         ]);
@@ -638,7 +680,7 @@ export default function LogsScannerPage() {
     return () => {
       cancelled = true;
     };
-  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist, loadLabProxyProfiles, loadLabHistory]);
+  }, [isStaff, loadUploads, loadKept, loadLimits, loadLabAllowlist, loadLabDomainHistory, loadLabProxyProfiles, loadLabHistory]);
 
   useEffect(() => {
     if (!scan || !ACTIVE.has(scan.status)) return undefined;
@@ -1368,7 +1410,7 @@ export default function LogsScannerPage() {
             disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
           />
           <datalist id="logs-scanner-lab-domains">
-            {labDomains.map((domain) => <option key={domain} value={domain} />)}
+            {labDomainOptions.map((row) => <option key={row.domain} value={row.domain} />)}
           </datalist>
           <Button
             variant="outlined"
@@ -1395,12 +1437,12 @@ export default function LogsScannerPage() {
               <Box>
                 <Typography variant="subtitle2">Domains từ scan đã quét</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Tích chọn nhiều domain rồi bấm Verify một lần. Đã chọn {labSelectedDomains.length}/{labDomains.length}.
+                  Tích chọn domain từ lịch sử scan rồi bấm Verify một lần. Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
                 </Typography>
               </Box>
               <Stack direction="row" spacing={0.75}>
-                <Button size="small" onClick={toggleAllLabDomains} disabled={!labDomains.length || labBusy}>
-                  {labSelectedDomains.length === labDomains.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                <Button size="small" onClick={toggleAllLabDomains} disabled={!labDomainOptions.length || labBusy}>
+                  {labSelectedDomains.length === labDomainOptions.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
                 </Button>
                 <Button size="small" onClick={() => setLabSelectedDomains([])} disabled={!labSelectedDomains.length || labBusy}>
                   Bỏ chọn
@@ -1408,9 +1450,10 @@ export default function LogsScannerPage() {
               </Stack>
             </Stack>
             <Stack spacing={0.25} sx={{ mt: 0.75, maxHeight: 180, overflowY: "auto" }}>
-              {labDomains.map((domain) => {
+              {labDomainOptions.map((option) => {
+                const { domain } = option;
                 const selected = labSelectedDomains.includes(domain);
-                const credentialCount = hits.filter((row) => String(row.domain || "").trim().toLowerCase().replace(/\.$/, "") === domain).length;
+                const isCurrentScan = String(option.scan_id) === String(scan?.id);
                 return (
                   <Stack
                     key={domain}
@@ -1428,12 +1471,13 @@ export default function LogsScannerPage() {
                       onChange={() => toggleLabDomain(domain)}
                     />
                     <Typography variant="body2" sx={{ flex: 1 }}>{domain}</Typography>
-                    <Chip size="small" label={`${credentialCount} credential`} variant="outlined" />
+                    <Chip size="small" label={`${option.hit_count} credential`} variant="outlined" />
+                    <Chip size="small" label={isCurrentScan ? "Scan hiện tại" : "Lịch sử"} color={isCurrentScan ? "info" : "default"} variant="outlined" />
                   </Stack>
                 );
               })}
-              {!labDomains.length ? (
-                <Typography variant="caption" color="text.secondary">Chưa có domain trong scan hiện tại.</Typography>
+              {!labDomainOptions.length ? (
+                <Typography variant="caption" color="text.secondary">Chưa có domain trong lịch sử scan.</Typography>
               ) : null}
             </Stack>
           </Paper>
