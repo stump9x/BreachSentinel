@@ -292,6 +292,8 @@ export default function LogsScannerPage() {
       }])
     );
     labDomains.forEach((domain) => {
+      const existing = options.get(domain);
+      if (existing) return;
       const hitCount = hits.filter((row) => {
         let rowDomain = String(row.domain || "").trim().toLowerCase().replace(/\.$/, "");
         if (!rowDomain) {
@@ -696,6 +698,7 @@ export default function LogsScannerPage() {
         setScan(latest);
         if (!ACTIVE.has(latest.status)) {
           await loadHits(latest.id);
+          await loadLabDomainHistory();
           setBusyScan(false);
           if (latest.status === "failed") {
             setError(latest.error_message || "Scan failed");
@@ -709,7 +712,7 @@ export default function LogsScannerPage() {
       }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [scan, loadHits]);
+  }, [scan, loadHits, loadLabDomainHistory]);
 
   useEffect(() => {
     const activeJobs = labJobs.filter((job) => ACTIVE.has(job.status));
