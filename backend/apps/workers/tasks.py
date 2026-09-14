@@ -167,6 +167,22 @@ def run_log_scan_task(self, scan_id: int) -> dict:
         raise self.retry(exc=exc, countdown=15) from exc
 
 
+@shared_task(bind=True, name="workers.log_upload_housekeeping", max_retries=1)
+def log_upload_housekeeping_task(self) -> dict:
+    """Trim completed log uploads after the aggregate storage limit is hit."""
+    from apps.core.task_lock import single_flight
+    from apps.workers.log_scanner import cleanup_large_upload_storage
+
+    with single_flight("workers.log_upload_housekeeping", ttl_sec=3600) as acquired:
+        if not acquired:
+            return {"skipped": True, "reason": "already_running"}
+        try:
+            return cleanup_large_upload_storage()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("log upload housekeeping failed")
+            raise self.retry(exc=exc, countdown=300) from exc
+
+
 @shared_task(name="workers.run_lab_login_scan")
 def run_lab_login_scan_task(job_id: int) -> dict:
     """Run one guarded Logs Scanner → BruteForceAI lab verification job."""

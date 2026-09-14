@@ -181,6 +181,15 @@ LOG_SCAN_MAX_UPLOAD_BYTES = env.int(
 LOG_SCAN_UPLOAD_CHUNK_BYTES = env.int(
     "LOG_SCAN_UPLOAD_CHUNK_BYTES", default=16 * 1024 * 1024
 )
+# Once stored dump files exceed this aggregate size, completed lab workflows
+# become eligible for retention cleanup. Credential hits from successful
+# login attempts remain in the database; raw dumps and unverified hits do not.
+LOG_SCAN_STORAGE_LIMIT_BYTES = env.int(
+    "LOG_SCAN_STORAGE_LIMIT_BYTES", default=5 * 1024 * 1024 * 1024
+)
+LOG_SCAN_RETENTION_GRACE_HOURS = env.int(
+    "LOG_SCAN_RETENTION_GRACE_HOURS", default=24
+)
 LOG_SCAN_MAX_HITS = env.int("LOG_SCAN_MAX_HITS", default=5000)
 LOG_SCAN_MAX_FILES_PER_SCAN = env.int("LOG_SCAN_MAX_FILES_PER_SCAN", default=25)
 
@@ -290,6 +299,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "workers.wire_housekeeping",
         "schedule": crontab(hour=3, minute=40),
         "kwargs": {"reset_feed_cache": False},
+    },
+    # Log Scanner retention: clean completed workflows after the 5 GB limit.
+    "log-upload-housekeeping-daily": {
+        "task": "workers.log_upload_housekeeping",
+        "schedule": crontab(hour=4, minute=0),
     },
 }
 

@@ -263,4 +263,10 @@ def run_lab_login_scan(job_id: int) -> dict:
                 "updated_at",
             ]
         )
+        try:
+            from apps.workers.tasks import log_upload_housekeeping_task
+
+            log_upload_housekeeping_task.delay()
+        except Exception:  # noqa: BLE001
+            logger.exception("unable to queue log upload cleanup after job %s", job.id)
     return {"id": job.id, "status": job.status, "attempts": job.attempt_count, "successes": job.success_count}

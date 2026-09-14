@@ -9,6 +9,7 @@ import shutil
 import time
 import uuid
 import fcntl
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -384,6 +385,137 @@ def delete_upload(upload) -> None:
     except OSError:
         logger.warning("Failed to delete log upload file %s", path)
     upload.delete()
+
+
+def _successful_hit_ids_for_upload(*, upload_id: int, jobs) -> set[int]:
+    """Return hit IDs whose credentials were reported successful by the lab."""
+    from apps.workers.models import LogScanHit
+
+    hits = list(
+        LogScanHit.objects.filter(upload_id=upload_id).only(
+            "id", "email", "username"
+        )
+    )
+    hits_by_id = {hit.id: hit for hit in hits}
+    successful_ids: set[int] = set()
+    for job in jobs:
+        job_hit_ids = set()
+        for hit_id in job.hit_ids or []:
+            try:
+                parsed_id = int(hit_id)
+            except (TypeError, ValueError):
+                continue
+            if parsed_id in hits_by_id:
+                job_hit_ids.add(parsed_id)
+        if not job_hit_ids or int(job.success_count or 0) <= 0:
+            continue
+
+        summary = job.result_summary if isinstance(job.result_summary, dict) else {}
+        results = summary.get("results") or []
+        successful_usernames = {
+            str(item.get("username") or "").strip().casefold()
+            for item in results
+            if isinstance(item, dict) and item.get("success")
+        }
+        if not successful_usernames:
+            # Older jobs may only have success_count. Keep their candidates
+            # rather than risk deleting a credential known to have succeeded.
+            successful_ids.update(job_hit_ids)
+            continue
+        for hit_id in job_hit_ids:
+            hit = hits_by_id[hit_id]
+            username = (hit.email or hit.username or "").strip().casefold()
+            if username and username in successful_usernames:
+                successful_ids.add(hit_id)
+    return successful_ids
+
+
+def cleanup_large_upload_storage() -> dict:
+    """Trim old raw dumps once aggregate upload storage exceeds its limit.
+
+    A dump is eligible only when its scans and lab jobs are no longer active.
+    Successful credential hits remain as encrypted database rows while the
+    raw file and all unverified hits are removed. A grace period protects a
+    freshly completed scan that has not yet been sent to the lab verifier.
+    """
+    from apps.workers.models import LabLoginScan, LogScan, LogScanHit, LogUpload
+
+    limit = int(
+        getattr(settings, "LOG_SCAN_STORAGE_LIMIT_BYTES", 5 * 1024 * 1024 * 1024)
+        or 0
+    )
+    if limit <= 0:
+        return {"skipped": True, "reason": "storage_limit_disabled"}
+
+    _cleanup_stale_partial_uploads()
+    total_bytes = sum(
+        int(size or 0) for size in LogUpload.objects.values_list("size_bytes", flat=True)
+    )
+    if total_bytes <= limit:
+        return {"skipped": True, "reason": "under_limit", "total_bytes": total_bytes}
+
+    active_scan_statuses = {LogScan.Status.QUEUED, LogScan.Status.RUNNING}
+    active_job_statuses = {LabLoginScan.Status.QUEUED, LabLoginScan.Status.RUNNING}
+    grace_hours = max(
+        0,
+        int(getattr(settings, "LOG_SCAN_RETENTION_GRACE_HOURS", 24) or 0),
+    )
+    cutoff = timezone.now() - timedelta(hours=grace_hours)
+    candidates = []
+
+    for upload in LogUpload.objects.order_by("created_at", "id").iterator():
+        scans = upload.scans.all()
+        if scans.filter(status__in=active_scan_statuses).exists():
+            continue
+        scan_ids = list(scans.values_list("id", flat=True))
+        if not scan_ids:
+            if upload.created_at and upload.created_at > cutoff:
+                continue
+            candidates.append((upload, []))
+            continue
+        jobs = list(LabLoginScan.objects.filter(scan_id__in=scan_ids))
+        if any(job.status in active_job_statuses for job in jobs):
+            continue
+        if not jobs and not scans.filter(updated_at__lte=cutoff).exists():
+            continue
+        candidates.append((upload, jobs))
+
+    removed_uploads = 0
+    removed_bytes = 0
+    retained_hits = 0
+    for upload, jobs in candidates:
+        if total_bytes <= limit:
+            break
+        path = Path(upload.stored_path or "")
+        try:
+            if path.is_file():
+                path.unlink()
+        except OSError:
+            logger.warning("Unable to remove old log upload %s", upload.pk)
+            continue
+
+        successful_ids = _successful_hit_ids_for_upload(
+            upload_id=upload.pk, jobs=jobs
+        )
+        hits_qs = LogScanHit.objects.filter(upload_id=upload.pk)
+        if successful_ids:
+            hits_qs.exclude(id__in=successful_ids).delete()
+        else:
+            hits_qs.delete()
+        retained_hits += len(successful_ids)
+        upload_size = int(upload.size_bytes or 0)
+        upload.delete()
+        total_bytes = max(0, total_bytes - upload_size)
+        removed_uploads += 1
+        removed_bytes += upload_size
+
+    return {
+        "skipped": False,
+        "total_bytes": total_bytes,
+        "removed_uploads": removed_uploads,
+        "removed_bytes": removed_bytes,
+        "retained_successful_hits": retained_hits,
+    }
 
 
 def scan_file_for_hits(
