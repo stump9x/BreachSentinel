@@ -242,7 +242,9 @@ def run_lab_login_scan(job_id: int) -> dict:
             job.error_message = ""
         elif service_status == "not_attempted":
             job.status = LabLoginScan.Status.NOT_ATTEMPTED
-            job.error_message = str(payload.get("error") or "No login attempt was made.")[:1000]
+            # The status column already communicates this outcome; avoid
+            # duplicating a long form-analysis warning in the UI.
+            job.error_message = ""
         else:
             job.status = LabLoginScan.Status.FAILED
             job.error_message = str(payload.get("error") or "BruteForceAI job failed.")[:1000]

@@ -872,9 +872,11 @@ export default function LogsScannerPage() {
         if (latestJobs.some((latest) => !ACTIVE.has(latest.status))) {
           await loadLabHistory();
           const finished = latestJobs.filter((latest) => !ACTIVE.has(latest.status));
-          const failed = finished.find((latest) => latest.status === "failed" || latest.status === "not_attempted");
+          const failed = finished.find((latest) => latest.status === "failed");
           if (failed) setError(failed.error_message || "Lab verification failed");
-          else setMessage(`Đã hoàn tất ${finished.length} job kiểm thử login.`);
+          else if (!finished.some((latest) => latest.status === "not_attempted")) {
+            setMessage(`Đã hoàn tất ${finished.length} job kiểm thử login.`);
+          }
         }
       } catch (err) {
         setError(err.message || "Lab verification poll failed");

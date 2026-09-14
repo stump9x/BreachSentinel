@@ -544,15 +544,10 @@ def _run_scan(request: ScanRequest, target_url: str) -> dict:
                 reason_code = "stage1_timeout" if LLM_PROVIDER and analyzed is None else (
                     "llm_not_configured" if not LLM_PROVIDER else "stage1_failed"
                 )
-                error = (
-                    "BruteForceAI stage1 timed out; no login attempt was made."
-                    if reason_code == "stage1_timeout"
-                    else "BruteForceAI could not analyze the login form; no login attempt was made."
-                )
                 return {
                     "status": "not_attempted",
                     "reason_code": reason_code,
-                    "error": error,
+                    "error": "",
                     "diagnostics": diagnostics,
                     "attempt_count": 0,
                     "success_count": 0,
