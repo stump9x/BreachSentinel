@@ -187,6 +187,26 @@ VIETNAM_KEYWORDS = VIETNAM_STRONG_KEYWORDS + VIETNAM_COMPANY_KEYWORDS
 
 # .vn domains / paths are a strong Vietnam signal even without the word "Vietnam".
 _VN_TLD_RE = re.compile(r"(?<![a-z0-9-])(?:[a-z0-9-]+\.)+vn\b", re.IGNORECASE)
+# Do not use substring matching for geography names.  A source/feed label can
+# contain a country name as part of a longer token or URL slug without the
+# article being about that country.
+_VN_STRONG_PATTERNS = tuple(
+    re.compile(
+        rf"(?<![A-Za-z0-9_]){re.escape(keyword).replace(r'\ ', r'[\s-]+')}(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    )
+    for keyword in VIETNAM_STRONG_KEYWORDS
+    if not re.search(r"[^\x00-\x7f]", keyword)
+)
+_VN_NATIVE_KEYWORDS = tuple(
+    keyword for keyword in VIETNAM_STRONG_KEYWORDS if re.search(r"[^\x00-\x7f]", keyword)
+)
+_REGIONAL_FLAG_RE = re.compile(r"[\U0001F1E6-\U0001F1FF]{2}")
+_GENERIC_MULTI_COUNTRY_RE = re.compile(
+    r"\b(?:global|multi[\s-]+country|across\s+\d+\s+countries|"
+    r"new\s+wave\s+of\s+\d+\s+(?:cybercrime|security)\s+(?:signals?|posts?))\b",
+    re.IGNORECASE,
+)
 # Require legal-form suffix — bare "công ty" matches every translated foreign firm.
 _VN_ENTITY_RE = re.compile(
     r"c(?:ô|o)ng\s+ty\s+(?:c(?:ổ|o)\s+ph(?:ầ|a)n|tnhh)\b",
@@ -217,12 +237,21 @@ def is_vietnam_related(*parts: str, allow_company_forms: bool = True) -> bool:
     if not text.strip():
         return False
     folded = text.casefold()
-    if any(k.casefold() in folded for k in VIETNAM_STRONG_KEYWORDS):
+    if any(pattern.search(text) for pattern in _VN_STRONG_PATTERNS):
+        return True
+    if any(keyword.casefold() in folded for keyword in _VN_NATIVE_KEYWORDS):
         return True
     if _VN_TLD_RE.search(text):
         return True
     if allow_company_forms:
-        if any(k.casefold() in folded for k in VIETNAM_COMPANY_KEYWORDS):
+        if any(
+            re.search(
+                rf"(?<![A-Za-z0-9_]){re.escape(keyword).replace(r'\ ', r'[\s-]+')}(?![A-Za-z0-9_])",
+                text,
+                re.IGNORECASE,
+            )
+            for keyword in VIETNAM_COMPANY_KEYWORDS
+        ):
             return True
         if _VN_ENTITY_RE.search(text):
             return True
@@ -264,7 +293,19 @@ def threat_looks_vietnam_related(
         ]
     )
     if is_vietnam_related(content):
-        return True
+        # A generic global/multi-country alert often lists 🇻🇳 alongside many
+        # other flags but contains no Vietnam-specific incident. Do not pin it
+        # as Vietnam unless the source text/metadata explicitly names Vietnam
+        # (or a Vietnamese city/entity) or the victim URL is .vn.
+        content_without_flags = _REGIONAL_FLAG_RE.sub(" ", content)
+        explicit_vietnam = is_vietnam_related(content_without_flags)
+        if not (
+            "🇻🇳" in content
+            and len(_REGIONAL_FLAG_RE.findall(content)) >= 3
+            and _GENERIC_MULTI_COUNTRY_RE.search(content)
+            and not explicit_vietnam
+        ):
+            return True
     url_blob = " ".join(
         [
             source_url,
@@ -355,10 +396,6 @@ def _classify_rss_item(item: dict[str, Any]) -> tuple[str, str, list[str], Decim
     is_claim_news = bool(item.get("alleged_claim")) or discovery == "claim-news"
     is_x_wire = discovery == "x-wire" or str(item.get("engine") or "") == "x_twitter"
     text = f"{item.get('title') or ''} {item.get('summary') or ''} {item.get('description') or ''}".lower()
-    meta = (
-        f"{item.get('feed') or ''} {item.get('country') or ''} "
-        f"{item.get('country_code') or ''} {item.get('link') or ''} {item.get('url') or ''}"
-    )
     hit = is_high_impact_intel(text)
     vietnam = threat_looks_vietnam_related(
         title=str(item.get("title") or ""),
@@ -366,7 +403,7 @@ def _classify_rss_item(item: dict[str, Any]) -> tuple[str, str, list[str], Decim
         source_url=str(item.get("link") or item.get("url") or ""),
         raw_payload=item,
         country_code=str(item.get("country_code") or ""),
-    ) or is_vietnam_related(meta)
+    )
 
     # Do not emit noisy generic tags ("rss", "news", "alleged-claim") into Wire.
     tags: list[str] = []
@@ -520,19 +557,17 @@ def enrich_threat_tags(threat: Threat) -> list[str]:
         source_url=source_url,
         raw_payload=payload,
     )
-    # Translated text: strong identity only (flag / country name / cities).
-    if not vietnam and vi_blob:
-        vietnam = is_vietnam_related(vi_blob, allow_company_forms=False)
-
-    # Never soft-tag Vietnam from publisher handle (VECERTRadar also covers
-    # Yemen / regional CTI). Geography must come from title/summary content.
+    # Never infer geography from machine-translated text.  A bad translation
+    # can hallucinate “Việt Nam” (or a city) even when the source is about
+    # another country.  Geography must come from the original content,
+    # structured country metadata, or a .vn victim URL.
 
     if vietnam:
         wanted.append("vietnam")
 
-    # Geo from original content + VI + flag emoji (not publisher URL).
+    # Geo from original content + structured country metadata (not publisher URL).
     for geo_tag in detect_geography_tag_slugs(
-        *original_parts, title_vi, summary_vi
+        *original_parts, country_code=str(payload.get("country_code") or "")
     ):
         if geo_tag not in wanted:
             wanted.append(geo_tag)
@@ -1065,4 +1100,3 @@ def ingest_rss_items(items: list[dict[str, Any]], *, source_label: str = "rss") 
         "skipped_unsafe": skipped_unsafe,
         "processed": created + updated,
     }
-

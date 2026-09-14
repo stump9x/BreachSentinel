@@ -80,8 +80,6 @@ class Command(BaseCommand):
                 detect_geography_tag_slugs(
                     threat.title,
                     threat.summary,
-                    getattr(threat, "title_vi", "") or "",
-                    getattr(threat, "summary_vi", "") or "",
                     content,
                     str(payload.get("country") or ""),
                     country_code=country_code,

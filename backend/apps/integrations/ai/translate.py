@@ -108,6 +108,10 @@ _RANSOMWARE_TITLE_RE = re.compile(
     r"^Ransomware:\s*(?P<victim>.+?)\s*\((?P<group>[^)]+)\)\s*$",
     re.IGNORECASE,
 )
+_DEFACEMENT_TITLE_RE = re.compile(
+    r"^Defacement\s+by\s+(?P<actor>[^:]+):\s*(?P<target>.+?)\s*$",
+    re.IGNORECASE,
+)
 
 _VIET_CHAR_RE = re.compile(
     r"[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡ"
@@ -148,6 +152,15 @@ _FOREIGN_SCRIPT_RE = re.compile(
 _CJK_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af]")
 _NON_LATIN_SCRIPT_RE = re.compile(
     r"[\u0400-\u04FF\u0600-\u06FF\u0E00-\u0E7F\u0900-\u097F]"
+)
+
+# Provider hallucinations must not introduce a Vietnam reference that is
+# absent from the source title.
+_VIETNAM_SIGNAL_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:vietnam(?:ese)?|viet[\s-]+nam|việt[\s-]+nam|"
+    r"hanoi|ha[\s-]+noi|hà[\s-]+nội|ho[\s-]+chi[\s-]+minh|"
+    r"hồ[\s-]+chí[\s-]+minh|saigon|sài[\s-]+gòn)(?![A-Za-z0-9_])|🇻🇳",
+    re.IGNORECASE,
 )
 
 # Adapted from NewsCrawler military doctrine + CTI Wire title constraints.
@@ -331,6 +344,38 @@ def has_obvious_garble(text: str, *, original: str = "") -> bool:
     return False
 
 
+def introduces_unmentioned_vietnam(original: str, translated: str) -> bool:
+    """Reject a draft that hallucinates Vietnam or a Vietnamese city."""
+    return bool(
+        _VIETNAM_SIGNAL_RE.search(translated or "")
+        and not _VIETNAM_SIGNAL_RE.search(original or "")
+    )
+
+
+def has_ollama_uppercase_garble(text: str, *, provider: str = "") -> bool:
+    """Detect the qwen fallback's common all-caps Vietnamese gibberish output."""
+    if not str(provider or "").startswith("ollama"):
+        return False
+    words = re.findall(r"\b[A-Za-zÀ-ỹĐđ]{2,}\b", text or "")
+    if len(words) < 8:
+        return False
+    uppercase = sum(1 for word in words if word == word.upper())
+    return uppercase / len(words) >= 0.72
+
+
+def has_translation_artifacts(original: str, translated: str) -> bool:
+    """Catch obvious provider artifacts such as duplicated words/cut-off text."""
+    words = re.findall(r"[A-Za-zÀ-ỹĐđ0-9]+", translated or "")
+    for previous, current in zip(words, words[1:]):
+        if previous.casefold() == current.casefold() and len(previous) > 1:
+            return True
+    source_len = len((original or "").strip())
+    translated_len = len((translated or "").strip())
+    if source_len >= 120 and translated_len < 48:
+        return True
+    return False
+
+
 def is_mangled_title_vi(
     title_vi: str, *, provider: str = "", original: str = ""
 ) -> bool:
@@ -346,6 +391,12 @@ def is_mangled_title_vi(
     if has_foreign_script(text, original=original):
         return True
     if original and translation_still_cjk(original, text):
+        return True
+    if original and introduces_unmentioned_vietnam(original, text):
+        return True
+    if has_ollama_uppercase_garble(text, provider=provider):
+        return True
+    if original and has_translation_artifacts(original, text):
         return True
     if original and brand_literal_mistranslated(original, text):
         return True
@@ -494,7 +545,7 @@ def google_draft_needs_ollama(original: str, draft: str) -> bool:
         return True
     if looks_vietnamese(text):
         # Accented Vietnamese with only allowed Latin remnants is fine.
-        return english_remnant_count(source, text) >= 6
+        return english_remnant_count(source, text) >= 4
     # No Vietnamese accents: treat as failed unless it is almost only proper nouns.
     return english_remnant_count(source, text) >= 2
 
@@ -596,15 +647,26 @@ def rule_translate_title(title: str) -> str | None:
     if looks_vietnamese(raw):
         return raw
     match = _RANSOMWARE_TITLE_RE.match(raw)
-    if not match:
-        return None
-    victim = match.group("victim").strip()
-    group = match.group("group").strip()
-    return f"Mã độc tống tiền: {victim} ({group})"[:512]
+    if match:
+        victim = match.group("victim").strip()
+        group = match.group("group").strip()
+        return f"Mã độc tống tiền: {victim} ({group})"[:512]
+    # Zone-H titles are structured and high volume; keep their Vietnamese
+    # wording stable instead of accepting inconsistent provider variants.
+    match = _DEFACEMENT_TITLE_RE.match(raw)
+    if match:
+        actor = match.group("actor").strip()
+        target = match.group("target").strip()
+        return f"Phá hoại bởi {actor}: {target}"[:512]
+    return None
 
 
 def is_structured_ransomware_title(title: str) -> bool:
     return bool(_RANSOMWARE_TITLE_RE.match((title or "").strip()))
+
+
+def is_structured_defacement_title(title: str) -> bool:
+    return bool(_DEFACEMENT_TITLE_RE.match((title or "").strip()))
 
 
 def reset_google_circuit() -> None:
@@ -973,7 +1035,7 @@ def _try_mymemory_fallback(threat: Threat, title: str) -> str | None:
     except TitleTranslateError as exc:
         logger.warning("mymemory fallback failed threat=%s: %s", threat.id, exc)
         return None
-    if is_mangled_title_vi(translated, provider="mymemory"):
+    if is_mangled_title_vi(translated, provider="mymemory", original=title):
         logger.warning("mymemory fallback rejected threat=%s: invalid Vietnamese", threat.id)
         return None
     _persist_translation(
@@ -1346,7 +1408,9 @@ def apply_inline_rule_translation(threat: Threat) -> bool:
         return True
 
     ruled = rule_translate_title(title)
-    if ruled and is_structured_ransomware_title(title):
+    if ruled and (
+        is_structured_ransomware_title(title) or _DEFACEMENT_TITLE_RE.match(title.strip())
+    ):
         _persist_translation(
             threat,
             title_vi=ruled,
@@ -1383,15 +1447,31 @@ def apply_inline_rule_translation(threat: Threat) -> bool:
                     provider="google:detected_vi",
                 )
                 return True
-            _persist_translation(
-                threat,
-                title_vi=draft,
-                status=Threat.TitleViStatus.OK,
-                provider="google",
-            )
+            google_needs_rescue = google_draft_needs_ollama(title, draft)
+            if google_needs_rescue:
+                # Keep malformed/hallucinated output out of the live feed; the
+                # async worker will retry with Groq/Ollama when available.
+                threat.title_vi = ""
+                threat.title_vi_status = Threat.TitleViStatus.PENDING
+                threat.title_vi_provider = "awaiting_quality_rescue"
+                threat.save(
+                    update_fields=[
+                        "title_vi",
+                        "title_vi_status",
+                        "title_vi_provider",
+                        "updated_at",
+                    ]
+                )
+            else:
+                _persist_translation(
+                    threat,
+                    title_vi=draft,
+                    status=Threat.TitleViStatus.OK,
+                    provider="google",
+                )
             # Queue LLM rescue only when Google is poor, or non-EN may beat Google.
             if (
-                google_draft_needs_ollama(title, draft)
+                google_needs_rescue
                 or (
                     non_english_ollama_compare()
                     and is_non_english_source(title, detected)
@@ -1411,7 +1491,10 @@ def apply_inline_rule_translation(threat: Threat) -> bool:
 
 def _should_force_retranslate(threat: Threat) -> bool:
     """Re-run translation on mangled drafts; never churn structured ransomware rules."""
-    if is_structured_ransomware_title(threat.title or "") and (
+    if (
+        is_structured_ransomware_title(threat.title or "")
+        or is_structured_defacement_title(threat.title or "")
+    ) and (
         threat.title_vi_status == Threat.TitleViStatus.RULE
         or str(threat.title_vi_provider or "") == "rule"
     ):
@@ -1424,7 +1507,9 @@ def _should_force_retranslate(threat: Threat) -> bool:
         return True
     if threat.title_vi_status != Threat.TitleViStatus.RULE:
         return False
-    if is_structured_ransomware_title(threat.title or ""):
+    if is_structured_ransomware_title(threat.title or "") or is_structured_defacement_title(
+        threat.title or ""
+    ):
         return False
     return True
 
@@ -1813,19 +1898,43 @@ def translate_threat(threat: Threat, *, force: bool = False) -> dict[str, Any]:
         )
         return {"id": threat.id, "status": "pending", "provider": "awaiting_google"}
 
-    # Persist Google first so Wire can show Vietnamese immediately.
+    google_needs_rescue = google_draft_needs_ollama(title, draft)
+
+    # Do not persist a known-bad Google draft before rescue.  Previously a
+    # failed fallback left gibberish (and even hallucinated Vietnam) visible in
+    # The Wire permanently.
+    if google_needs_rescue:
+        rescued = _try_ai_fallback(threat, title)
+        if rescued:
+            return {"id": threat.id, "status": "ok", "provider": rescued}
+        if _existing_draft_is_usable(threat, title):
+            return {
+                "id": threat.id,
+                "status": threat.title_vi_status or Threat.TitleViStatus.OK,
+                "provider": threat.title_vi_provider,
+                "cached": True,
+            }
+        threat.title_vi_status = Threat.TitleViStatus.PENDING
+        threat.title_vi_provider = "awaiting_quality_rescue"
+        threat.title_vi = ""
+        threat.save(
+            update_fields=[
+                "title_vi",
+                "title_vi_status",
+                "title_vi_provider",
+                "updated_at",
+            ]
+        )
+        return {"id": threat.id, "status": "pending", "provider": "awaiting_quality_rescue"}
+
+    # Persist only a quality-checked Google draft so Wire never shows a known
+    # bad translation while a rescue is pending.
     _persist_translation(
         threat,
         title_vi=draft,
         status=Threat.TitleViStatus.OK,
         provider="google",
     )
-
-    # LLM rescue only when Google draft is actually poor.
-    if google_draft_needs_ollama(title, draft):
-        rescued = _try_ai_fallback(threat, title)
-        if rescued:
-            return {"id": threat.id, "status": "ok", "provider": rescued}
 
     # Non-English: compare Ollama; keep only when clearly better.
     if is_non_english_source(title, detected):
@@ -1854,6 +1963,10 @@ def translate_threats(
     qs = Threat.objects.all().order_by("-wire_priority", "-published_at", "-id")
     if threat_ids:
         qs = qs.filter(id__in=threat_ids)
+    elif force:
+        # An explicit force run is used to repair already-persisted provider
+        # output (including low-quality Google drafts), not only pending rows.
+        qs = qs.filter(wire_relevant=True).exclude(title="")
     else:
         # Only unfinished / known-bad titles. Valid rule/google results stay untouched.
         qs = qs.filter(

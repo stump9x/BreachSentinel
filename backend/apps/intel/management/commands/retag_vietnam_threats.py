@@ -8,6 +8,11 @@ from django.core.management.base import BaseCommand
 
 from apps.intel.models import Tag, Threat
 from apps.workers.services import (
+    impact_wire_priority,
+    is_high_impact_intel,
+    looks_like_data_breach,
+    looks_like_data_leak,
+    looks_like_ransomware_topic,
     threat_looks_vietnam_related,
     vietnam_wire_priority,
 )
@@ -29,6 +34,8 @@ class Command(BaseCommand):
         scanned = 0
         tagged = 0
         prioritized = 0
+        untagged = 0
+        demoted = 0
         victims: set[str] = set()
 
         queryset = Threat.objects.prefetch_related("tags").order_by("id")
@@ -41,6 +48,31 @@ class Command(BaseCommand):
                 raw_payload=threat.raw_payload,
             )
             if not looks_vn:
+                # Reconcile stale tags created by older machine translations.
+                # Vietnam must be supported by original content/metadata, never
+                # by title_vi or summary_vi.
+                if threat.tags.filter(slug="vietnam").exists():
+                    threat.tags.remove(vn_tag)
+                    untagged += 1
+                if threat.wire_priority >= priority:
+                    payload = threat.raw_payload if isinstance(threat.raw_payload, dict) else {}
+                    blob = " ".join(
+                        str(value or "")
+                        for value in (
+                            threat.title,
+                            threat.summary,
+                            payload.get("description"),
+                            payload.get("summary"),
+                        )
+                    ).casefold()
+                    if looks_like_ransomware_topic(blob) or looks_like_data_breach(blob) or looks_like_data_leak(blob) or is_high_impact_intel(blob):
+                        threat.wire_priority = impact_wire_priority()
+                    elif payload.get("discovery") in {"x-wire", "forum-rss", "forum-claim", "claim-news"}:
+                        threat.wire_priority = max(1, impact_wire_priority() // 2)
+                    else:
+                        threat.wire_priority = 0
+                    threat.save(update_fields=["wire_priority", "updated_at"])
+                    demoted += 1
                 continue
 
             changed_fields: list[str] = []
@@ -95,6 +127,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Vietnam retag complete · scanned={scanned} tagged={tagged} "
-                f"prioritized={prioritized} related_news={related}"
+                f"prioritized={prioritized} untagged={untagged} demoted={demoted} "
+                f"related_news={related}"
             )
         )
