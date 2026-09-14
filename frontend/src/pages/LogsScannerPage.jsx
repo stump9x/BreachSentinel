@@ -14,7 +14,6 @@ import {
   Typography,
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -1329,13 +1328,6 @@ export default function LogsScannerPage() {
             />
             <Button
               variant="contained"
-              startIcon={
-                busyScan ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : (
-                  <AutoFixHighIcon />
-                )
-              }
               disabled={busyScan || !selectedIds.size}
               onClick={startScan}
               sx={{ whiteSpace: "nowrap" }}
