@@ -1307,7 +1307,6 @@ export default function LogsScannerPage() {
     <Box>
       <PageHeader
         title="Logs Scanner"
-        subtitle="Upload stealer .txt dumps (url:username:password), filter by keyword, and keep matches for follow-up."
       />
 
       {error ? (
@@ -1371,9 +1370,6 @@ export default function LogsScannerPage() {
               </Button>
             ) : null}
           </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-            Maximum {MAX_FILES_PER_UPLOAD} files per upload · up to {UPLOAD_CONCURRENCY} files upload in parallel · files over {formatBytes(UPLOAD_CHUNK_BYTES)} use resumable chunks · up to {formatBytes(maxUploadBytes)} per file.
-          </Typography>
           {uploadProgress.files.length ? (
             <Box sx={{ mt: 1.5 }}>
               <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
@@ -1525,6 +1521,49 @@ export default function LogsScannerPage() {
               </Typography>
             ) : null}
           </Box>
+        </Paper>
+      </Stack>
+
+      <Stack direction={{ xs: "column", lg: "row" }} spacing={2} alignItems="stretch" sx={{ mb: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, flex: 1.4, minHeight: 280 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="subtitle1">
+              {scan && ACTIVE.has(scan.status)
+                ? `Scanning… (${scan.status})`
+                : scan
+                  ? "Results"
+                  : "Ready to scan"}
+            </Typography>
+            <Chip
+              size="small"
+              label={`Found: ${hits.length}${scan?.hit_count != null && scan.hit_count !== hits.length ? ` / ${scan.hit_count}` : ""}`}
+            />
+          </Stack>
+          <DataTable
+            columns={hitColumns}
+            rows={hits}
+            empty="No results yet"
+            loading={busyScan && !hits.length}
+          />
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2, flex: 1, minHeight: 280 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="subtitle1">Kept records</Typography>
+              <Chip size="small" color="primary" label={String(kept.length)} />
+            </Stack>
+            <Button
+              size="small"
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              disabled={!kept.length}
+              onClick={clearKept}
+            >
+              Clear all
+            </Button>
+          </Stack>
+          <DataTable columns={keptColumns} rows={kept} empty="No kept records" />
         </Paper>
       </Stack>
 
@@ -1888,48 +1927,6 @@ export default function LogsScannerPage() {
         </Box>
       </Paper>
 
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={2} alignItems="stretch">
-        <Paper variant="outlined" sx={{ p: 2, flex: 1.4, minHeight: 280 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="subtitle1">
-              {scan && ACTIVE.has(scan.status)
-                ? `Scanning… (${scan.status})`
-                : scan
-                  ? "Results"
-                  : "Ready to scan"}
-            </Typography>
-            <Chip
-              size="small"
-              label={`Found: ${hits.length}${scan?.hit_count != null && scan.hit_count !== hits.length ? ` / ${scan.hit_count}` : ""}`}
-            />
-          </Stack>
-          <DataTable
-            columns={hitColumns}
-            rows={hits}
-            empty="No results yet"
-            loading={busyScan && !hits.length}
-          />
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: 2, flex: 1, minHeight: 280 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="subtitle1">Kept records</Typography>
-              <Chip size="small" color="primary" label={String(kept.length)} />
-            </Stack>
-            <Button
-              size="small"
-              color="error"
-              startIcon={<DeleteOutlineIcon />}
-              disabled={!kept.length}
-              onClick={clearKept}
-            >
-              Clear all
-            </Button>
-          </Stack>
-          <DataTable columns={keptColumns} rows={kept} empty="No kept records" />
-        </Paper>
-      </Stack>
     </Box>
   );
 }
