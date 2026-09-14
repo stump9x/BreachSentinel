@@ -1543,9 +1543,10 @@ export default function LogsScannerPage() {
             value={labDomain}
             onChange={(event) => setLabDomain(event.target.value)}
             disabled={labBusy || allowlistBusy}
+            InputLabelProps={{ shrink: true }}
             SelectProps={{ displayEmpty: true }}
           >
-            <MenuItem value=""><em>Chọn domain đã scan</em></MenuItem>
+            <MenuItem value="" aria-label="Clear selected domain"> </MenuItem>
             {labDomainOptions.map((row) => (
               <MenuItem key={row.domain} value={row.domain}>{row.domain}</MenuItem>
             ))}
