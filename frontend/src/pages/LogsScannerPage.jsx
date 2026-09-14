@@ -184,6 +184,7 @@ export default function LogsScannerPage() {
   const [labHistory, setLabHistory] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [domainHistoryExpanded, setDomainHistoryExpanded] = useState(true);
   const labVerifySubmittingRef = useRef(false);
 
   const loadUploads = useCallback(async () => {
@@ -329,7 +330,7 @@ export default function LogsScannerPage() {
         const timeDiff = new Date(b.latest_scanned_at || 0).getTime() - new Date(a.latest_scanned_at || 0).getTime();
         return timeDiff || a.domain.localeCompare(b.domain);
       })
-      .slice(0, 10);
+      .slice(0, 20);
   }, [labDomainHistory, labDomains, hits, scan?.id, scan?.completed_at, scan?.created_at]);
 
   useEffect(() => {
@@ -1545,53 +1546,67 @@ export default function LogsScannerPage() {
             variant="outlined"
             sx={{ flex: "1 1 100%", p: 1.25, borderRadius: 2, bgcolor: "background.default" }}
           >
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} justifyContent="space-between">
-              <Box>
-                <Typography variant="subtitle2">Domains từ scan đã quét</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  10 domain scan gần nhất, mới nhất xếp trên. Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={0.75}>
-                <Button size="small" onClick={toggleAllLabDomains} disabled={!labDomainOptions.length || labBusy}>
-                  {labSelectedDomains.length === labDomainOptions.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
-                </Button>
-                <Button size="small" onClick={() => setLabSelectedDomains([])} disabled={!labSelectedDomains.length || labBusy}>
-                  Bỏ chọn
-                </Button>
+            <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="space-between">
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                <IconButton
+                  size="small"
+                  title={domainHistoryExpanded ? "Thu gọn domain đã scan" : "Mở rộng domain đã scan"}
+                  aria-label={domainHistoryExpanded ? "Thu gọn domain đã scan" : "Mở rộng domain đã scan"}
+                  onClick={() => setDomainHistoryExpanded((current) => !current)}
+                >
+                  {domainHistoryExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                </IconButton>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle2">Domains từ scan đã quét</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    20 domain scan gần nhất, mới nhất xếp trên. Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
+                  </Typography>
+                </Box>
               </Stack>
-            </Stack>
-            <Stack spacing={0.25} sx={{ mt: 0.75, maxHeight: 180, overflowY: "auto" }}>
-              {labDomainOptions.map((option) => {
-                const { domain } = option;
-                const selected = labSelectedDomains.includes(domain);
-                const isCurrentScan = String(option.scan_id) === String(scan?.id);
-                return (
-                  <Stack
-                    key={domain}
-                    direction="row"
-                    spacing={0.75}
-                    alignItems="center"
-                    sx={{ px: 0.5, borderRadius: 1, cursor: "pointer", bgcolor: selected ? "action.selected" : "transparent", "&:hover": { bgcolor: "action.hover" } }}
-                    onClick={() => toggleLabDomain(domain)}
-                  >
-                    <Checkbox
-                      size="small"
-                      checked={selected}
-                      disabled={labBusy}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={() => toggleLabDomain(domain)}
-                    />
-                    <Typography variant="body2" sx={{ flex: 1 }}>{domain}</Typography>
-                    <Chip size="small" label={`${option.hit_count} credential`} variant="outlined" />
-                    <Chip size="small" label={isCurrentScan ? "Scan hiện tại" : "Lịch sử"} color={isCurrentScan ? "info" : "default"} variant="outlined" />
-                  </Stack>
-                );
-              })}
-              {!labDomainOptions.length ? (
-                <Typography variant="caption" color="text.secondary">Chưa có domain trong lịch sử scan.</Typography>
+              {domainHistoryExpanded ? (
+                <Stack direction="row" spacing={0.75}>
+                  <Button size="small" onClick={toggleAllLabDomains} disabled={!labDomainOptions.length || labBusy}>
+                    {labSelectedDomains.length === labDomainOptions.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                  </Button>
+                  <Button size="small" onClick={() => setLabSelectedDomains([])} disabled={!labSelectedDomains.length || labBusy}>
+                    Bỏ chọn
+                  </Button>
+                </Stack>
               ) : null}
             </Stack>
+            {domainHistoryExpanded ? (
+              <Stack spacing={0.25} sx={{ mt: 0.75, maxHeight: 260, overflowY: "auto" }}>
+                {labDomainOptions.map((option) => {
+                  const { domain } = option;
+                  const selected = labSelectedDomains.includes(domain);
+                  const isCurrentScan = String(option.scan_id) === String(scan?.id);
+                  return (
+                    <Stack
+                      key={domain}
+                      direction="row"
+                      spacing={0.75}
+                      alignItems="center"
+                      sx={{ px: 0.5, borderRadius: 1, cursor: "pointer", bgcolor: selected ? "action.selected" : "transparent", "&:hover": { bgcolor: "action.hover" } }}
+                      onClick={() => toggleLabDomain(domain)}
+                    >
+                      <Checkbox
+                        size="small"
+                        checked={selected}
+                        disabled={labBusy}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleLabDomain(domain)}
+                      />
+                      <Typography variant="body2" sx={{ flex: 1 }}>{domain}</Typography>
+                      <Chip size="small" label={`${option.hit_count} credential`} variant="outlined" />
+                      <Chip size="small" label={isCurrentScan ? "Scan hiện tại" : "Lịch sử"} color={isCurrentScan ? "info" : "default"} variant="outlined" />
+                    </Stack>
+                  );
+                })}
+                {!labDomainOptions.length ? (
+                  <Typography variant="caption" color="text.secondary">Chưa có domain trong lịch sử scan.</Typography>
+                ) : null}
+              </Stack>
+            ) : null}
           </Paper>
           <Paper
             variant="outlined"

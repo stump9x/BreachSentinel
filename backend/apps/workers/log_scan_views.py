@@ -427,7 +427,7 @@ class LabDomainHistoryView(APIView):
                 latest_scanned_at=Max("scan__created_at"),
                 latest_scan_id=Subquery(latest_scan),
             )
-            .order_by("-latest_scanned_at", "domain")[:10]
+            .order_by("-latest_scanned_at", "domain")[:20]
         )
         payload = []
         for row in rows:
