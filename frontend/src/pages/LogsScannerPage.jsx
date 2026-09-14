@@ -185,8 +185,10 @@ export default function LogsScannerPage() {
   const [allowlistBusy, setAllowlistBusy] = useState(false);
   const [labHistory, setLabHistory] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
-  const [historyExpanded, setHistoryExpanded] = useState(true);
-  const [domainHistoryExpanded, setDomainHistoryExpanded] = useState(true);
+  // Keep the history panels compact after every page load; users can expand
+  // either panel with its arrow when they need to review entries.
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [domainHistoryExpanded, setDomainHistoryExpanded] = useState(false);
   const labVerifySubmittingRef = useRef(false);
 
   const loadUploads = useCallback(async () => {
