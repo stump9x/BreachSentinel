@@ -34,6 +34,7 @@ const UPLOAD_CONCURRENCY = MAX_FILES_PER_UPLOAD;
 const UPLOAD_RETRIES = 2;
 const UPLOAD_CHUNK_BYTES = 16 * 1024 * 1024;
 const DEFAULT_MAX_UPLOAD_BYTES = 1536 * 1024 * 1024;
+const MAX_SCAN_WAIT_ATTEMPTS = 600;
 
 function formatBytes(n) {
   const value = Number(n) || 0;
@@ -266,6 +267,16 @@ export default function LogsScannerPage() {
     setHits(data.results || data || []);
   }, []);
 
+  const waitForLogScan = useCallback(async (scanId) => {
+    let latest = await api.get(`/api/v1/logs/scans/${scanId}/`);
+    for (let attempt = 0; attempt < MAX_SCAN_WAIT_ATTEMPTS; attempt += 1) {
+      if (!ACTIVE.has(latest.status)) return latest;
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      latest = await api.get(`/api/v1/logs/scans/${scanId}/`);
+    }
+    throw new Error("Scan bổ sung mất quá nhiều thời gian, vui lòng kiểm tra lại lịch sử scan.");
+  }, []);
+
   const labDomains = useMemo(() => {
     const values = new Set();
     hits.forEach((row) => {
@@ -353,12 +364,66 @@ export default function LogsScannerPage() {
   );
 
   const startLabVerification = async () => {
-    if (!scan?.id || !labSelectedDomains.length) return;
+    if (!selectedIds.size || !labSelectedDomains.length) {
+      setError("Hãy chọn ít nhất một file logs và một domain trước khi verify.");
+      return;
+    }
     setLabBusy(true);
     setError("");
     setMessage("");
     try {
       const optionByDomain = new Map(labDomainOptions.map((row) => [row.domain, row]));
+      const selectedUploadIds = [...selectedIds].map(Number);
+      const selectedUploadSet = new Set(selectedUploadIds.map(String));
+      const sourceScanIds = [...new Set(
+        labSelectedDomains
+          .map((domain) => optionByDomain.get(domain)?.scan_id)
+          .filter(Boolean)
+          .map(String)
+      )];
+      const sourceScanRows = await Promise.all(sourceScanIds.map(async (scanId) => (
+        [scanId, await api.get(`/api/v1/logs/scans/${scanId}/`)]
+      )));
+      const sourceScans = new Map(sourceScanRows);
+      const matchesSelectedFiles = (source) => {
+        if (!source || source.status !== "completed") return false;
+        const sourceUploads = new Set((source.upload_ids || []).map(String));
+        return sourceUploads.size === selectedUploadSet.size
+          && [...sourceUploads].every((id) => selectedUploadSet.has(id));
+      };
+      const domainsNeedingScan = labSelectedDomains.filter((domain) => {
+        const option = optionByDomain.get(domain);
+        return !option?.scan_id || !matchesSelectedFiles(sourceScans.get(String(option.scan_id)));
+      });
+
+      if (domainsNeedingScan.length) {
+        setBusyScan(true);
+        setMessage(`Đang scan ${domainsNeedingScan.length} domain chưa có kết quả trên các file đã chọn…`);
+        const created = await api.post("/api/v1/logs/scans/", {
+          // Use a full scan so every selected domain can be resolved in one pass.
+          keyword: "",
+          upload_ids: selectedUploadIds,
+          async_mode: true,
+        });
+        setScan(created);
+        const completed = await waitForLogScan(created.id);
+        setScan(completed);
+        setBusyScan(false);
+        if (completed.status !== "completed") {
+          throw new Error(completed.error_message || "Scan bổ sung thất bại.");
+        }
+        domainsNeedingScan.forEach((domain) => {
+          sourceScans.set(String(completed.id), completed);
+          optionByDomain.set(domain, {
+            ...(optionByDomain.get(domain) || {}),
+            domain,
+            scan_id: completed.id,
+          });
+        });
+        await loadHits(completed.id);
+        await loadLabDomainHistory();
+      }
+
       const groupedTargets = new Map();
       labSelectedDomains.forEach((domain) => {
         const option = optionByDomain.get(domain);
@@ -395,6 +460,7 @@ export default function LogsScannerPage() {
     } catch (err) {
       setError(err.message || "Failed to start lab verification");
     } finally {
+      setBusyScan(false);
       setLabBusy(false);
     }
   };
@@ -1408,7 +1474,7 @@ export default function LogsScannerPage() {
             value={labDomain}
             onChange={(event) => setLabDomain(event.target.value)}
             inputProps={{ list: "logs-scanner-lab-domains" }}
-            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy}
+            disabled={labBusy || allowlistBusy}
           />
           <datalist id="logs-scanner-lab-domains">
             {labDomainOptions.map((row) => <option key={row.domain} value={row.domain} />)}
@@ -1428,7 +1494,7 @@ export default function LogsScannerPage() {
             value={labTargetUrl}
             onChange={(event) => setLabTargetUrl(event.target.value)}
             helperText={labSelectedDomains.length > 1 ? "Chỉ dùng khi chọn đúng 1 domain; nhiều domain sẽ dùng URL mặc định." : ""}
-            disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy || labSelectedDomains.length > 1}
+            disabled={labBusy || allowlistBusy || labSelectedDomains.length > 1}
           />
           <Paper
             variant="outlined"
@@ -1596,7 +1662,7 @@ export default function LogsScannerPage() {
                     placeholder="socks5://proxy.lab:1080 hoặc proxy.lab:1080"
                     value={labProxyUrl}
                     onChange={(event) => setLabProxyUrl(event.target.value)}
-                    disabled={!scan || ACTIVE.has(scan.status) || labBusy || allowlistBusy || proxyProfileBusy}
+                    disabled={labBusy || allowlistBusy || proxyProfileBusy}
                   />
                   <TextField
                     fullWidth
@@ -1642,7 +1708,7 @@ export default function LogsScannerPage() {
           <Button
             variant="contained"
             color="warning"
-            disabled={!scan || ACTIVE.has(scan.status) || !labSelectedDomains.length || labBusy}
+            disabled={!selectedIds.size || !labSelectedDomains.length || labBusy || labJobs.some((job) => ACTIVE.has(job.status))}
             onClick={startLabVerification}
           >
             {labBusy || labJobs.some((job) => ACTIVE.has(job.status))
