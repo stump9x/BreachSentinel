@@ -364,6 +364,28 @@ export default function LogsScannerPage() {
     [labJob]
   );
 
+  const labHistoryDisplay = useMemo(() => {
+    const seenDomains = new Set();
+    return [...labHistory]
+      .sort((a, b) => {
+        const timeDiff = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        return timeDiff || Number(b.id || 0) - Number(a.id || 0);
+      })
+      .filter((row) => {
+        let domain = String(row.target_domain || "").trim().toLowerCase().replace(/\.$/, "");
+        if (!domain) {
+          try {
+            domain = new URL(row.target_url || "").hostname.toLowerCase().replace(/\.$/, "");
+          } catch {
+            domain = "";
+          }
+        }
+        if (!domain || seenDomains.has(domain)) return false;
+        seenDomains.add(domain);
+        return true;
+      });
+  }, [labHistory]);
+
   const startLabVerification = async () => {
     if (labVerifySubmittingRef.current) return;
     const selectedDomains = [...new Set(
@@ -379,6 +401,9 @@ export default function LogsScannerPage() {
     setLabBusy(true);
     setError("");
     setMessage("");
+    // The queue panel represents only the current batch; older attempts stay in history.
+    setLabJobs([]);
+    setLabJob(null);
     try {
       const optionByDomain = new Map(labDomainOptions.map((row) => [row.domain, row]));
       const selectedUploadIds = [...selectedIds].map(Number);
@@ -1782,8 +1807,8 @@ export default function LogsScannerPage() {
               >
                 {historyExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
               </IconButton>
-              <Typography variant="subtitle2">Login attempt history</Typography>
-              <Chip size="small" label={String(labHistory.length)} />
+              <Typography variant="subtitle2">Login attempt history · latest per domain</Typography>
+              <Chip size="small" label={String(labHistoryDisplay.length)} />
             </Stack>
             {historyExpanded ? <Stack direction="row" spacing={1}>
               <Button
@@ -1800,8 +1825,8 @@ export default function LogsScannerPage() {
           {historyExpanded ? (
             <DataTable
               columns={labHistoryColumns}
-              rows={labHistory}
-              loading={historyBusy && !labHistory.length}
+              rows={labHistoryDisplay}
+              loading={historyBusy && !labHistoryDisplay.length}
               empty="No login history yet"
             />
           ) : null}
