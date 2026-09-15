@@ -142,11 +142,6 @@ export default function IntelligencePage() {
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
       {msg ? <Alert severity="success">{msg}</Alert> : null}
-      <Alert severity="info">
-        MISP (Malware Information Sharing Platform) là nền tảng để các đội ngũ chia sẻ
-        thông tin về mã độc và mối đe dọa. IOC là các dấu hiệu cần theo dõi như IP, tên miền
-        hoặc mã băm. Bạn có thể xuất IOC sang MISP hoặc nhập IOC từ MISP để dùng chung với hệ thống.
-      </Alert>
 
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
         <Chip
