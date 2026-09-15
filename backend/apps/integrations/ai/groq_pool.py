@@ -310,6 +310,7 @@ def groq_chat_completion(
     # disable reasoning for this model family to avoid false empty-text failures.
     if str(model).casefold().startswith("openai/gpt-oss"):
         body["include_reasoning"] = False
+        body["reasoning_effort"] = "low"
 
     errors: list[str] = []
     attempted: set[str] = set()

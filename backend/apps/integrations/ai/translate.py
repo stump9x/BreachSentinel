@@ -1275,7 +1275,7 @@ def groq_translate_title(title: str) -> str:
                 },
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=160 if is_cjk_title(title) else 120,
+            max_tokens=320 if is_cjk_title(title) else 256,
             temperature=0.1,
             model=model,
             timeout=timeout,
