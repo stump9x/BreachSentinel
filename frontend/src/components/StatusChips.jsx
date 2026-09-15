@@ -29,7 +29,7 @@ export function SeverityChip({ value }) {
   return <Chip size="small" label={v || "—"} color={SEVERITY[v] || "default"} variant="outlined" />;
 }
 
-export function StatusChip({ value }) {
+export function StatusChip({ value, label }) {
   const v = (value || "").toLowerCase();
-  return <Chip size="small" label={v || "—"} color={STATUS[v] || "default"} variant="outlined" />;
+  return <Chip size="small" label={label ?? (v || "—")} color={STATUS[v] || "default"} variant="outlined" />;
 }

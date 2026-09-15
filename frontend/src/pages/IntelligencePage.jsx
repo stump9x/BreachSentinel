@@ -12,13 +12,37 @@ import { DataTable } from "../components/DataTable";
 import { PageHeader } from "../components/PageHeader";
 import { StatusChip } from "../components/StatusChips";
 
+const STATUS_LABELS = {
+  ok: "Thành công",
+  success: "Thành công",
+  completed: "Hoàn tất",
+  running: "Đang chạy",
+  queued: "Đang chờ",
+  pending: "Chờ xử lý",
+  skipped: "Bỏ qua",
+  partial: "Một phần",
+  failed: "Thất bại",
+  error: "Lỗi",
+};
+
+const DIRECTION_LABELS = {
+  export: "Xuất sang MISP",
+  import: "Nhập từ MISP",
+  both: "Hai chiều",
+};
+
+function VietnameseStatusChip({ value }) {
+  const key = String(value || "").toLowerCase();
+  return <StatusChip value={value} label={STATUS_LABELS[key] || value || "—"} />;
+}
+
 export default function IntelligencePage() {
   const [briefings, setBriefings] = useState([]);
   const [logs, setLogs] = useState([]);
   const [misp, setMisp] = useState(null);
   const [health, setHealth] = useState(null);
   const [nerText, setNerText] = useState(
-    "Observed 203.0.113.10 resolving to threat.example linked to CVE-2024-21762"
+    "Phát hiện 203.0.113.10 trỏ tới threat.example, liên quan CVE-2024-21762"
   );
   const [nerResult, setNerResult] = useState(null);
   const [latestBriefing, setLatestBriefing] = useState(null);
@@ -41,7 +65,7 @@ export default function IntelligencePage() {
       setMisp(m);
       setHealth(h);
     } catch (err) {
-      setError(err.message || "Failed to load intelligence panel");
+      setError(err.message || "Không thể tải bảng tình báo");
     }
   }, []);
 
@@ -59,10 +83,10 @@ export default function IntelligencePage() {
         async_mode: false,
       });
       setLatestBriefing(data);
-      setMsg(`Briefing ready via provider=${data.provider}`);
+      setMsg(`Đã tạo bản tóm tắt bằng ${data.provider || "AI"}`);
       await load();
     } catch (err) {
-      setError(err.message || "Briefing failed");
+      setError(err.message || "Không thể tạo bản tóm tắt");
     } finally {
       setBusy("");
     }
@@ -77,9 +101,9 @@ export default function IntelligencePage() {
         persist: true,
       });
       setNerResult(data);
-      setMsg(`Extracted entities · persisted ${data.persisted_created}`);
+      setMsg(`Đã trích xuất thực thể · lưu mới ${data.persisted_created ?? 0}`);
     } catch (err) {
-      setError(err.message || "NER failed");
+      setError(err.message || "Không thể trích xuất thực thể");
     } finally {
       setBusy("");
     }
@@ -95,11 +119,14 @@ export default function IntelligencePage() {
         limit: 50,
         async_mode: false,
       });
-      const statuses = (data.results || []).map((r) => r.status).join(", ");
-      setMsg(`MISP ${direction}: ${statuses}`);
+      const statusLabel = { ok: "thành công", success: "thành công", skipped: "bỏ qua", error: "lỗi" };
+      const statuses = (data.results || [])
+        .map((r) => statusLabel[r.status] || r.status)
+        .join(", ");
+      setMsg(`MISP — ${direction === "export" ? "xuất" : direction === "import" ? "nhập" : "đồng bộ hai chiều"}: ${statuses}`);
       await load();
     } catch (err) {
-      setError(err.message || "MISP sync failed");
+      setError(err.message || "Không thể đồng bộ MISP");
     } finally {
       setBusy("");
     }
@@ -108,51 +135,56 @@ export default function IntelligencePage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        title="AI & MISP"
+        title="Tóm tắt AI"
         action={
           <Button variant="outlined" onClick={load}>
-            Refresh
+            Làm mới
           </Button>
         }
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
       {msg ? <Alert severity="success">{msg}</Alert> : null}
+      <Alert severity="info">
+        MISP (Malware Information Sharing Platform) là nền tảng để các đội ngũ chia sẻ
+        thông tin về mã độc và mối đe dọa. IOC là các dấu hiệu cần theo dõi như IP, tên miền
+        hoặc mã băm. Bạn có thể xuất IOC sang MISP hoặc nhập IOC từ MISP để dùng chung với hệ thống.
+      </Alert>
 
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
         <Chip
           size="small"
           variant="outlined"
           color={health?.ai?.anthropic_configured ? "success" : "default"}
-          label={`Anthropic: ${health?.ai?.anthropic_configured ? "on" : "off"}`}
+          label={`Anthropic: ${health?.ai?.anthropic_configured ? "bật" : "tắt"}`}
         />
         <Chip
           size="small"
           variant="outlined"
           color={health?.ai?.huggingface_configured ? "success" : "default"}
-          label={`HuggingFace: ${health?.ai?.huggingface_configured ? "on" : "off"}`}
+          label={`HuggingFace: ${health?.ai?.huggingface_configured ? "bật" : "tắt"}`}
         />
         <Chip
           size="small"
           variant="outlined"
           color={misp?.configured ? "success" : "default"}
-          label={`MISP: ${misp?.configured ? "configured" : "not configured"}`}
+          label={`MISP: ${misp?.configured ? "đã cấu hình" : "chưa cấu hình"}`}
         />
         <Chip
           size="small"
           variant="outlined"
           color={health?.searxng_configured ? "success" : "default"}
-          label={`SearxNG: ${health?.searxng_configured ? "on" : "off"}`}
+          label={`SearxNG: ${health?.searxng_configured ? "bật" : "tắt"}`}
         />
       </Stack>
 
-      <Typography variant="h6">AI briefing</Typography>
+      <Typography variant="h6">Bản tóm tắt AI</Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
         <Button
           variant="contained"
           onClick={generateBriefing}
           disabled={Boolean(busy)}
         >
-          {busy === "briefing" ? "Generating…" : "Generate 24h briefing"}
+          {busy === "briefing" ? "Đang tạo…" : "Tạo bản tóm tắt 24 giờ"}
         </Button>
         <Button
           variant="outlined"
@@ -163,22 +195,22 @@ export default function IntelligencePage() {
             try {
               const data = await api.post("/api/v1/ai/weekly-digest/", {});
               setLatestBriefing(data);
-              setMsg("Weekly top-5 digest ready");
+              setMsg("Đã tạo bản tóm tắt top 5 trong tuần");
               await load();
             } catch (err) {
-              setError(err.message || "Weekly digest failed");
+              setError(err.message || "Không thể tạo tóm tắt tuần");
             } finally {
               setBusy("");
             }
           }}
         >
-          Weekly top-5 digest
+          Tóm tắt top 5 tuần
         </Button>
       </Stack>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-start">
         <TextField
-          label="Keyword summary"
-          placeholder="lockbit / CVE-2024 / your domain"
+          label="Tóm tắt theo từ khóa"
+          placeholder="lockbit / CVE-2024 / tên miền"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           sx={{ minWidth: 280, flex: 1 }}
@@ -196,21 +228,21 @@ export default function IntelligencePage() {
                 window_hours: 168,
               });
               setLatestBriefing(data);
-              setMsg(`Keyword summary for "${keyword.trim()}" ready`);
+              setMsg(`Đã tóm tắt từ khóa "${keyword.trim()}"`);
               await load();
             } catch (err) {
-              setError(err.message || "Keyword summary failed");
+              setError(err.message || "Không thể tóm tắt từ khóa");
             } finally {
               setBusy("");
             }
           }}
         >
-          Summarize keyword
+          Tóm tắt
         </Button>
       </Stack>
       {latestBriefing?.content ? (
         <TextField
-          label="Latest briefing"
+          label="Bản tóm tắt mới nhất"
           value={latestBriefing.content}
           multiline
           minRows={8}
@@ -219,9 +251,9 @@ export default function IntelligencePage() {
         />
       ) : null}
 
-      <Typography variant="h6">Entity extraction</Typography>
+      <Typography variant="h6">Trích xuất thực thể</Typography>
       <TextField
-        label="Raw intel text"
+        label="Văn bản tình báo"
         value={nerText}
         onChange={(e) => setNerText(e.target.value)}
         multiline
@@ -234,7 +266,7 @@ export default function IntelligencePage() {
         disabled={Boolean(busy) || !nerText.trim()}
         sx={{ alignSelf: "flex-start" }}
       >
-        {busy === "ner" ? "Extracting…" : "Extract & persist IOCs"}
+        {busy === "ner" ? "Đang trích xuất…" : "Trích xuất và lưu IOC"}
       </Button>
       {nerResult ? (
         <Typography variant="body2" color="text.secondary" component="pre" sx={{ whiteSpace: "pre-wrap" }}>
@@ -242,14 +274,14 @@ export default function IntelligencePage() {
         </Typography>
       ) : null}
 
-      <Typography variant="h6">MISP sync</Typography>
+      <Typography variant="h6">Đồng bộ MISP</Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
         <Button
           variant="outlined"
           disabled={Boolean(busy)}
           onClick={() => syncMisp("export")}
         >
-          Export IOCs → MISP
+          Xuất IOC → MISP
         </Button>
         <Button
           variant="outlined"
@@ -257,7 +289,7 @@ export default function IntelligencePage() {
           disabled={Boolean(busy)}
           onClick={() => syncMisp("import")}
         >
-          Import MISP → IOCs
+          Nhập MISP → IOC
         </Button>
         <Button
           variant="contained"
@@ -265,55 +297,59 @@ export default function IntelligencePage() {
           disabled={Boolean(busy)}
           onClick={() => syncMisp("both")}
         >
-          Sync both
+          Đồng bộ hai chiều
         </Button>
       </Stack>
       {!misp?.configured ? (
         <Typography variant="body2" color="text.secondary">
-          Set MISP_URL and MISP_API_KEY in `.env` to enable live sync. Unconfigured
-          runs return status <code>skipped</code>.
+          Thêm MISP_URL và MISP_API_KEY vào `.env` để bật đồng bộ. Khi chưa cấu hình, tác vụ sẽ
+          được bỏ qua.
         </Typography>
       ) : null}
 
-      <Typography variant="h6">Recent briefings</Typography>
+      <Typography variant="h6">Bản tóm tắt gần đây</Typography>
       <DataTable
         rows={briefings}
         columns={[
-          { id: "title", label: "Title" },
-          { id: "provider", label: "Provider" },
+          { id: "title", label: "Tiêu đề" },
+          { id: "provider", label: "Nhà cung cấp" },
           {
             id: "status",
-            label: "Status",
-            render: (row) => <StatusChip value={row.status} />,
+            label: "Trạng thái",
+            render: (row) => <VietnameseStatusChip value={row.status} />,
           },
           {
             id: "counts",
-            label: "Counts",
+            label: "Số liệu",
             render: (row) =>
-              `T${row.threat_count}/I${row.indicator_count}/L${row.leak_count}`,
+              `Tin: ${row.threat_count} · IOC: ${row.indicator_count} · Rò rỉ: ${row.leak_count}`,
           },
           {
             id: "created_at",
-            label: "Created",
+            label: "Thời gian tạo",
             render: (row) =>
               row.created_at ? new Date(row.created_at).toLocaleString() : "—",
           },
         ]}
       />
 
-      <Typography variant="h6">Integration logs</Typography>
+      <Typography variant="h6">Nhật ký tích hợp</Typography>
       <DataTable
         rows={logs}
         columns={[
-          { id: "target", label: "Target" },
-          { id: "direction", label: "Direction" },
+          { id: "target", label: "Đích" },
+          {
+            id: "direction",
+            label: "Chiều đồng bộ",
+            render: (row) => DIRECTION_LABELS[row.direction] || row.direction || "—",
+          },
           {
             id: "status",
-            label: "Status",
-            render: (row) => <StatusChip value={row.status} />,
+            label: "Trạng thái",
+            render: (row) => <VietnameseStatusChip value={row.status} />,
           },
-          { id: "message", label: "Message" },
-          { id: "records_processed", label: "Records" },
+          { id: "message", label: "Thông báo" },
+          { id: "records_processed", label: "Số bản ghi" },
         ]}
       />
     </Stack>
