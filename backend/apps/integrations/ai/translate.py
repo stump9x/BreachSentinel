@@ -167,7 +167,10 @@ _VIETNAM_SIGNAL_RE = re.compile(
     re.IGNORECASE,
 )
 _MIXED_SCRIPT_WORD_RE = re.compile(
-    r"[A-Za-z]{3,}[À-ỹĐđ]+|[À-ỹĐđ]+[A-Za-z]{3,}",
+    # Require at least two characters from the second script.  This avoids
+    # flagging ordinary Vietnamese words such as “triệu” (tri + ệ) while still
+    # catching glued provider output such as “ALERTHƯỜNG”.
+    r"[A-Za-z]{3,}[À-ỹĐđ]{2,}|[À-ỹĐđ]{2,}[A-Za-z]{3,}",
 )
 _OLLAMA_ENGLISH_CONTENT_RE = re.compile(
     r"\b(?:alert|threat|intelligence|activity|status|confirmed|evidence|"
@@ -500,9 +503,12 @@ def is_mangled_title_vi(
         phrase = match.group(0).strip()
         if phrase and phrase.casefold() not in (original or "").casefold():
             return True
-    if str(provider).startswith(
-        ("google+ollama", "ollama-fallback", "groq")
-    ) and remnant >= 3:
+    if str(provider).startswith(("google+ollama", "ollama-fallback")) and remnant >= 3:
+        return True
+    # Vietnamese is accent-rich but still contains short unaccented words
+    # (e.g. “trong”, “quan”, “Nam”). Do not reject a clearly Vietnamese Groq
+    # result solely because those words were counted as Latin remnants.
+    if str(provider).startswith("groq") and remnant >= 4 and not looks_vietnamese(text):
         return True
     if re.fullmatch(r"[?¿!\s.…]{2,}", text):
         return True

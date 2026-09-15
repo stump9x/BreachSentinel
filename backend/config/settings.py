@@ -292,7 +292,10 @@ CELERY_BEAT_SCHEDULE = {
     "translate-wire-titles-every-60s": {
         "task": "integrations.translate_threat_titles",
         "schedule": 60.0,
-        "kwargs": {"limit": 25},
+        # Small batches keep Ollama fallback jobs responsive; the next beat
+        # tick continues draining the queue without one long task monopolizing
+        # the single-flight lock.
+        "kwargs": {"limit": 5},
     },
     # Safe retention: delete Wire items past 7d / VN 30d + generic tags (daily 03:40).
     "wire-housekeeping-daily": {
