@@ -41,9 +41,7 @@ export default function IntelligencePage() {
   const [logs, setLogs] = useState([]);
   const [misp, setMisp] = useState(null);
   const [health, setHealth] = useState(null);
-  const [nerText, setNerText] = useState(
-    "Phát hiện 203.0.113.10 trỏ tới threat.example, liên quan CVE-2024-21762"
-  );
+  const [nerText, setNerText] = useState("");
   const [nerResult, setNerResult] = useState(null);
   const [latestBriefing, setLatestBriefing] = useState(null);
   const [keyword, setKeyword] = useState("ransomware");
