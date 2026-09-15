@@ -169,6 +169,58 @@ _VIETNAM_SIGNAL_RE = re.compile(
 _MIXED_SCRIPT_WORD_RE = re.compile(
     r"[A-Za-z]{3,}[À-ỹĐđ]+|[À-ỹĐđ]+[A-Za-z]{3,}",
 )
+_OLLAMA_ENGLISH_CONTENT_RE = re.compile(
+    r"\b(?:alert|threat|intelligence|activity|status|confirmed|evidence|"
+    r"type|multi|vector|cyber|defacement|credential|exposure|date|attack|"
+    r"campaign|target|victim|group|operation|incident|warning)\b",
+    re.IGNORECASE,
+)
+_KNOWN_BAD_VI_TRANSLATION_RE = re.compile(
+    r"\b(?:trí tuệ\s+đe\s+dọa|đa\s+vector|tiếp\s+xúc\s+chứng\s+nhận|"
+    r"xác\s+nhận,\s*tiếp\s+xúc)\b",
+    re.IGNORECASE,
+)
+_OLLAMA_CONTENT_REPLACEMENTS = (
+    (re.compile(r"\bđược xác thực dữ liệu\b", re.IGNORECASE), "bằng chứng đã xác nhận"),
+    (re.compile(r"\btính năng\s*:", re.IGNORECASE), "loại:"),
+    (re.compile(r"\ngiả mạo trang\b", re.IGNORECASE), "phá hoại giao diện"),
+    (re.compile(r"\bgiả mạo trang\b", re.IGNORECASE), "phá hoại giao diện"),
+    (re.compile(r"\blộ số đăng nhập\b", re.IGNORECASE), "lộ thông tin đăng nhập"),
+    (re.compile(r"\brông\b", re.IGNORECASE), "rộng"),
+    (re.compile(r"\bthreat\s+intelligence\b", re.IGNORECASE), "tình báo mối đe dọa"),
+    (re.compile(r"\bmulti[-\s]+vector\s+cyber\s+activity\b", re.IGNORECASE), "hoạt động mạng đa hướng"),
+    (re.compile(r"\bconfirmed\s+evidence\b", re.IGNORECASE), "bằng chứng đã xác nhận"),
+    (re.compile(r"\bcredential\s+exposure\b", re.IGNORECASE), "lộ thông tin đăng nhập"),
+    (re.compile(r"\bdefacement\b", re.IGNORECASE), "phá hoại giao diện"),
+    (re.compile(r"\balert\b", re.IGNORECASE), "cảnh báo"),
+    (re.compile(r"\bthreat\b", re.IGNORECASE), "mối đe dọa"),
+    (re.compile(r"\bintelligence\b", re.IGNORECASE), "tình báo"),
+    (re.compile(r"\bactivity\b", re.IGNORECASE), "hoạt động"),
+    (re.compile(r"\bstatus\b", re.IGNORECASE), "trạng thái"),
+    (re.compile(r"\bevidence\b", re.IGNORECASE), "bằng chứng"),
+    (re.compile(r"\bconfirmed\b", re.IGNORECASE), "đã xác nhận"),
+    (re.compile(r"\btype\b", re.IGNORECASE), "loại"),
+    (re.compile(r"\bcyber\b", re.IGNORECASE), "mạng"),
+    (re.compile(r"\bvector\b", re.IGNORECASE), "hướng"),
+    (re.compile(r"\bdate\b", re.IGNORECASE), "ngày"),
+    (re.compile(r"\battack\b", re.IGNORECASE), "tấn công"),
+    (re.compile(r"\bcampaign\b", re.IGNORECASE), "chiến dịch"),
+    (re.compile(r"\btarget\b", re.IGNORECASE), "mục tiêu"),
+    (re.compile(r"\bvictim\b", re.IGNORECASE), "nạn nhân"),
+    (re.compile(r"\bgroup\b", re.IGNORECASE), "nhóm"),
+    (re.compile(r"\boperation\b", re.IGNORECASE), "chiến dịch"),
+    (re.compile(r"\bincident\b", re.IGNORECASE), "sự cố"),
+    (re.compile(r"\bwarning\b", re.IGNORECASE), "cảnh báo"),
+    (re.compile(r"\btình báo mối đe dọa\s+cảnh báo\b", re.IGNORECASE), "cảnh báo tình báo mối đe dọa"),
+)
+
+
+def normalize_ollama_content_terms(text: str) -> str:
+    """Translate a small allowlisted set of leaked CTI content words."""
+    normalized = text or ""
+    for pattern, replacement in _OLLAMA_CONTENT_REPLACEMENTS:
+        normalized = pattern.sub(replacement, normalized)
+    return " ".join(normalized.split())
 
 # Adapted from NewsCrawler military doctrine + CTI Wire title constraints.
 _CTI_WIRE_TRANSLATION_DOCTRINE = """
@@ -405,6 +457,10 @@ def is_mangled_title_vi(
         return True
     if _MIXED_SCRIPT_WORD_RE.search(text):
         return True
+    if _OLLAMA_ENGLISH_CONTENT_RE.search(text):
+        return True
+    if _KNOWN_BAD_VI_TRANSLATION_RE.search(text):
+        return True
     if original and has_translation_artifacts(original, text):
         return True
     if original and brand_literal_mistranslated(original, text):
@@ -563,6 +619,11 @@ def accept_ollama_translation(original: str, translated: str) -> bool:
     """Validate Ollama output; reject CJK leftovers and EN/VI garble."""
     text = normalize_translated_title(original, translated).strip()
     if not text:
+        return False
+    # qwen2.5:3b may copy common English CTI words even when the sentence is
+    # otherwise Vietnamese. Reject those drafts instead of showing a half-
+    # translated headline; callers will try another prompt or keep English.
+    if _OLLAMA_ENGLISH_CONTENT_RE.search(text):
         return False
     if re.fullmatch(r"[?¿!\s.…]{2,}", text):
         return False
@@ -1227,7 +1288,12 @@ def groq_translate_title(title: str) -> str:
 
 
 def ollama_translate_title(title: str) -> str:
-    """Translate via shared Ollama (NewsCrawler nc-ollama); preferred for CJK / non-EN rescue."""
+    """Translate via shared Ollama with a strict CTI headline prompt.
+
+    Ollama is a fallback for both English and non-English titles when Groq is
+    unavailable.  The concise first prompt improves qwen2.5:3b adherence and
+    avoids the mixed-language/glued-word output seen with the long prompt alone.
+    """
     base = (getattr(settings, "OLLAMA_BASE_URL", "") or "").rstrip("/")
     model = getattr(settings, "OLLAMA_TRANSLATE_MODEL", "qwen2.5:3b")
     timeout = float(getattr(settings, "OLLAMA_TIMEOUT_SEC", 120) or 120)
@@ -1242,7 +1308,21 @@ def ollama_translate_title(title: str) -> str:
         or DEFAULT_FALLBACK_PROMPT
     )
     prepared = prepare_title_for_translate(title)
-    prompts = [template.replace("{title}", prepared)]
+    strict_prompt = (
+        "Bạn là biên tập viên tình báo mạng. Dịch chính xác tiêu đề sau sang "
+        "tiếng Việt trang trọng. Không thêm, không bớt, không suy diễn; không "
+        "bịa quốc gia, địa danh hay tác nhân. Dịch mọi từ nội dung, không để "
+        "lẫn câu tiếng Anh và tuyệt đối không nối liền từ tiếng Anh với tiếng "
+        "Việt. Giữ nguyên emoji, URL, tên hãng, nhóm mã độc, CVE và thuật ngữ "
+        "kỹ thuật. Các từ Alert, Threat, Intelligence, Activity, Status, "
+        "Confirmed, Evidence, Type, Cyber, Defacement, Credential và Exposure "
+        "phải được dịch, không được chép lại. Tuyệt đối không dùng chữ Hán, "
+        "tiếng Trung, Nhật, Hàn hoặc ngôn ngữ thứ ba. Kết quả bắt buộc có từ "
+        "tiếng Việt có dấu. Chỉ trả về MỘT dòng tiêu đề tiếng Việt, không chú "
+        "thích.\n\n"
+        f"Tiêu đề nguồn:\n{prepared}"
+    )
+    prompts = [strict_prompt, template.replace("{title}", prepared)]
     if is_cjk_title(title):
         prompts.append(
             f"{_CTI_WIRE_TRANSLATION_DOCTRINE}\n\n"
@@ -1283,7 +1363,9 @@ def ollama_translate_title(title: str) -> str:
         except (httpx.HTTPError, ValueError) as exc:
             last_error = exc
             continue
-        text = _clean_model_output(str(data.get("response") or ""))
+        text = normalize_ollama_content_terms(
+            _clean_model_output(str(data.get("response") or ""))
+        )
         if not text:
             last_error = TitleTranslateError("Ollama fallback returned empty text")
             continue
@@ -1531,6 +1613,7 @@ def _should_force_retranslate(threat: Threat) -> bool:
     ) and (
         threat.title_vi_status == Threat.TitleViStatus.RULE
         or str(threat.title_vi_provider or "") == "rule"
+        or str(threat.title_vi_provider or "").startswith("original:")
     ):
         return False
     if is_mangled_title_vi(
@@ -1613,15 +1696,13 @@ def _try_groq_fallback(threat: Threat, title: str) -> str | None:
 
 
 def _try_ai_fallback(threat: Threat, title: str) -> str | None:
-    """Prefer Groq; use Ollama only for non-Latin/non-English source titles."""
+    """Prefer Groq, then use validated Ollama for any source language."""
     hit = _try_groq_fallback(threat, title)
     if hit:
         return hit
-    # qwen2.5:3b is prone to corrupting ordinary English CTI headlines
-    # (e.g. concatenating “ALERT” with Vietnamese words). Google/MyMemory are
-    # safer for English; reserve Ollama for scripts where Google often fails.
-    if not is_cjk_title(title) and not is_non_english_source(title):
-        return None
+    # Ollama output is passed through accept_ollama_translation, which rejects
+    # glued mixed-script words, hallucinated Vietnam, and excessive English
+    # remnants.  If it fails, callers retain the original English title.
     return _try_ollama_fallback(threat, title)
 
 
