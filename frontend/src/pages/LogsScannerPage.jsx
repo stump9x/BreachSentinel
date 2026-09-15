@@ -1584,10 +1584,7 @@ export default function LogsScannerPage() {
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Stack direction="column" spacing={1.5}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2">Lab login verification</Typography>
-            <Typography variant="caption" color="text.secondary">
-              Allowlisted lab targets only · max 20 pairs · single-threaded · passwords are not saved in results.
-            </Typography>
+            <Typography variant="subtitle2">Login verification</Typography>
           </Box>
           <TextField
             size="small"
@@ -1622,8 +1619,7 @@ export default function LogsScannerPage() {
             value={labTargetUrl}
             onChange={(event) => setLabTargetUrl(event.target.value)}
             helperText={labSelectedDomains.length > 1
-              ? "Chỉ dùng khi chọn đúng 1 domain; mặc định mỗi credential dùng URL đầy đủ từ kết quả scan."
-              : "Để trống để dùng URL đầy đủ tương ứng trong kết quả scan; nhập URL để ghi đè thủ công."}
+              ? "Chỉ dùng khi chọn đúng 1 domain; mặc định mỗi credential dùng URL đầy đủ từ kết quả scan." : undefined}
             disabled={labBusy || allowlistBusy || labSelectedDomains.length > 1}
           />
           <Paper
@@ -1643,7 +1639,7 @@ export default function LogsScannerPage() {
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="subtitle2">Domains từ scan đã quét</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    20 domain scan gần nhất, mới nhất xếp trên. Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
+                    Đã chọn {labSelectedDomains.length}/{labDomainOptions.length}.
                   </Typography>
                 </Box>
               </Stack>
@@ -1699,9 +1695,6 @@ export default function LogsScannerPage() {
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} justifyContent="space-between">
               <Box>
                 <Typography variant="subtitle2">Proxy login</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Chọn một proxy đã lưu bằng dấu tích, hoặc dùng trực tiếp không qua proxy.
-                </Typography>
               </Box>
               <Button
                 size="small"
