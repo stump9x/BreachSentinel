@@ -160,9 +160,7 @@ export default function FeedSourcesPage() {
       ) : null}
 
       <Typography variant="body2" color="text.secondary">
-        Active: {rows.filter((r) => r.is_active).length} / {totalCount || rows.length} · Full
-        Watcher sources.csv (~220) + CERT/breach extras. Feeds that fail a sweep auto-disable;
-        staff can re-enable after fixing the URL.
+        Active: {rows.filter((r) => r.is_active).length}
       </Typography>
 
       <DataTable
