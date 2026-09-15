@@ -1,5 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import viewsets
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
@@ -131,6 +133,92 @@ class FeedSourceViewSet(viewsets.ModelViewSet):
         if self.action in {"list", "retrieve"}:
             return [IsAuthenticated()]
         return [IsAdminUser()]
+
+    @action(detail=False, methods=["post"], url_path="bulk-import")
+    def bulk_import(self, request):
+        """Import a pasted URL/Markdown list without activating unverified feeds.
+
+        The source catalogue often contains site homepages, API endpoints and
+        Telegram/onion links mixed with real RSS URLs.  Creating those rows as
+        active feeds would make every sweep repeatedly fetch non-feed pages, so
+        bulk imports are inactive by default.  Analysts can validate and enable
+        individual rows from the table afterwards.
+        """
+        import re
+        from urllib.parse import urlparse
+
+        raw = request.data.get("urls", request.data.get("text", ""))
+        if isinstance(raw, (list, tuple)):
+            chunks = [str(item) for item in raw]
+        else:
+            chunks = re.findall(r"https?://[^\s<>\]\)\"']+", str(raw or ""))
+        urls: list[str] = []
+        seen: set[str] = set()
+        invalid: list[str] = []
+        for value in chunks:
+            url = value.strip().rstrip(".,;:!?\"'")
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower().rstrip(".")
+            if parsed.scheme not in {"http", "https"} or not host:
+                if url:
+                    invalid.append(url[:2048])
+                continue
+            key = url.rstrip("/").lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            urls.append(url[:2048])
+
+        category = str(request.data.get("category") or "news").lower()
+        if category not in {choice[0] for choice in FeedSource.Category.choices}:
+            category = FeedSource.Category.NEWS
+        try:
+            confidence = max(1, min(5, int(request.data.get("confidence", 5))))
+        except (TypeError, ValueError):
+            confidence = 5
+        activate_value = request.data.get("activate", False)
+        activate = (
+            activate_value
+            if isinstance(activate_value, bool)
+            else str(activate_value).strip().lower() in {"1", "true", "yes", "on"}
+        )
+
+        created = 0
+        existing = 0
+        for url in urls:
+            row = FeedSource.objects.filter(url__iexact=url).first()
+            if row:
+                existing += 1
+                continue
+            host = (urlparse(url).hostname or "source").lower()
+            is_onion = host.endswith(".onion")
+            FeedSource.objects.create(
+                name=host[:128],
+                url=url,
+                category=category,
+                confidence=confidence,
+                is_active=activate,
+                requires_tor=is_onion,
+                notes=(
+                    "Bulk-imported candidate; verify it exposes RSS/Atom before enabling."
+                    if not activate
+                    else "Bulk-imported URL."
+                ),
+            )
+            created += 1
+
+        return Response(
+            {
+                "created": created,
+                "existing": existing,
+                "invalid": invalid[:100],
+                "invalid_count": len(invalid),
+                "received": len(chunks),
+                "unique_urls": len(urls),
+                "active": activate,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class WatchRuleViewSet(viewsets.ModelViewSet):

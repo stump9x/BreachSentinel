@@ -35,8 +35,11 @@ export default function FeedSourcesPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +88,33 @@ export default function FeedSourcesPage() {
     }
   }
 
+  async function bulkImport(event) {
+    event.preventDefault();
+    if (!bulkText.trim()) return;
+    setBulkBusy(true);
+    setError("");
+    setMsg("");
+    try {
+      const data = await api.post("/api/v1/feed-sources/bulk-import/", {
+        text: bulkText,
+        category: "news",
+        confidence: 5,
+        activate: false,
+      });
+      setBulkOpen(false);
+      setBulkText("");
+      setMsg(
+        `Đã nhập ${data.created || 0} nguồn mới; ${data.existing || 0} nguồn đã có sẵn. ` +
+          "Các nguồn mới đang tắt để tránh quét nhầm URL không phải RSS."
+      );
+      await load();
+    } catch (err) {
+      setError(err.message || "Bulk import failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function queueIngest() {
     setBusy(true);
     setError("");
@@ -112,6 +142,9 @@ export default function FeedSourcesPage() {
           <Stack direction="row" spacing={1}>
             <Button variant="outlined" disabled={busy} onClick={queueIngest}>
               Sweep now
+            </Button>
+            <Button variant="outlined" onClick={() => setBulkOpen(true)}>
+              Import URLs
             </Button>
             <Button variant="contained" onClick={() => setOpen(true)}>
               Add source
@@ -234,6 +267,36 @@ export default function FeedSourcesPage() {
             <Button onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" variant="contained">
               Save
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog open={bulkOpen} onClose={() => !bulkBusy && setBulkOpen(false)} fullWidth maxWidth="md">
+        <form onSubmit={bulkImport}>
+          <DialogTitle>Import nhiều URL</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="info">
+                Dán danh sách URL hoặc Markdown dạng [tên](URL), mỗi dòng một URL. Hệ thống tự
+                loại trùng. Nguồn nhập hàng loạt được tắt mặc định; chỉ bật sau khi xác nhận URL
+                thực sự có RSS/Atom.
+              </Alert>
+              <TextField
+                label="URL list"
+                required
+                multiline
+                minRows={12}
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder="https://example.com/feed.xml\nhttps://example.org"
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setBulkOpen(false)} disabled={bulkBusy}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={bulkBusy || !bulkText.trim()}>
+              {bulkBusy ? "Importing…" : "Import URLs"}
             </Button>
           </DialogActions>
         </form>
