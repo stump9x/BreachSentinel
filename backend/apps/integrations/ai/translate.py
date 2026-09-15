@@ -166,6 +166,9 @@ _VIETNAM_SIGNAL_RE = re.compile(
     r"hồ[\s-]+chí[\s-]+minh|saigon|sài[\s-]+gòn)(?![A-Za-z0-9_])|🇻🇳",
     re.IGNORECASE,
 )
+_MIXED_SCRIPT_WORD_RE = re.compile(
+    r"[A-Za-z]{3,}[À-ỹĐđ]+|[À-ỹĐđ]+[A-Za-z]{3,}",
+)
 
 # Adapted from NewsCrawler military doctrine + CTI Wire title constraints.
 _CTI_WIRE_TRANSLATION_DOCTRINE = """
@@ -400,6 +403,8 @@ def is_mangled_title_vi(
         return True
     if has_ollama_uppercase_garble(text, provider=provider):
         return True
+    if _MIXED_SCRIPT_WORD_RE.search(text):
+        return True
     if original and has_translation_artifacts(original, text):
         return True
     if original and brand_literal_mistranslated(original, text):
@@ -432,7 +437,7 @@ def is_mangled_title_vi(
             return True
     if str(provider).startswith(
         ("google+ollama", "ollama-fallback", "groq")
-    ) and remnant >= 4:
+    ) and remnant >= 3:
         return True
     if re.fullmatch(r"[?¿!\s.…]{2,}", text):
         return True
@@ -568,7 +573,10 @@ def accept_ollama_translation(original: str, translated: str) -> bool:
     if is_mangled_title_vi(text, provider="ollama-fallback", original=original):
         return False
     if looks_vietnamese(text):
-        return True
+        # qwen frequently returns an accented Vietnamese-looking sentence
+        # with several untranslated English fragments. Keep Ollama only when
+        # the remaining Latin words are proper nouns/CTI terms.
+        return english_remnant_count(original, text) <= 2
     # Soft accept for CJK sources: some accents + CTI signal words.
     if is_cjk_title(original) and vietnamese_ratio(text) >= 0.08:
         return english_remnant_count(original, text) <= 2
@@ -1593,10 +1601,15 @@ def _try_groq_fallback(threat: Threat, title: str) -> str | None:
 
 
 def _try_ai_fallback(threat: Threat, title: str) -> str | None:
-    """Prefer Groq (shared key pool), then local Ollama as last LLM resort."""
+    """Prefer Groq; use Ollama only for non-Latin/non-English source titles."""
     hit = _try_groq_fallback(threat, title)
     if hit:
         return hit
+    # qwen2.5:3b is prone to corrupting ordinary English CTI headlines
+    # (e.g. concatenating “ALERT” with Vietnamese words). Google/MyMemory are
+    # safer for English; reserve Ollama for scripts where Google often fails.
+    if not is_cjk_title(title) and not is_non_english_source(title):
+        return None
     return _try_ollama_fallback(threat, title)
 
 
