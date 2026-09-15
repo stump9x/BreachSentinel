@@ -1402,6 +1402,26 @@ def _persist_translation(
         logger.debug("enrich_threat_tags failed threat=%s", threat.id, exc_info=True)
 
 
+def _persist_original_title_fallback(threat: Threat, *, reason: str) -> str:
+    """Keep the source title visible when every translation is low quality.
+
+    A failed translation must never make a Wire item disappear.  ``FAILED``
+    keeps the record eligible for a later retry while ``title_vi`` carries the
+    original English headline as a safe, readable fallback.
+    """
+    source = (threat.title or "").strip()[:512]
+    if not source:
+        return ""
+    provider = f"original:{reason}"[:64]
+    _persist_translation(
+        threat,
+        title_vi=source,
+        status=Threat.TitleViStatus.FAILED,
+        provider=provider,
+    )
+    return provider
+
+
 def apply_inline_rule_translation(threat: Threat) -> bool:
     """Instant path: Vietnamese skip, cache, structured rule, or inline Google."""
     title = threat.title or ""
@@ -1470,18 +1490,10 @@ def apply_inline_rule_translation(threat: Threat) -> bool:
                 return True
             google_needs_rescue = google_draft_needs_ollama(title, draft)
             if google_needs_rescue:
-                # Keep malformed/hallucinated output out of the live feed; the
-                # async worker will retry with Groq/Ollama when available.
-                threat.title_vi = ""
-                threat.title_vi_status = Threat.TitleViStatus.PENDING
-                threat.title_vi_provider = "awaiting_quality_rescue"
-                threat.save(
-                    update_fields=[
-                        "title_vi",
-                        "title_vi_status",
-                        "title_vi_provider",
-                        "updated_at",
-                    ]
+                # Never show malformed output; keep the original headline in
+                # the live feed while the async worker retries translation.
+                _persist_original_title_fallback(
+                    threat, reason="quality_rescue"
                 )
             else:
                 _persist_translation(
@@ -1889,12 +1901,10 @@ def translate_threat(threat: Threat, *, force: bool = False) -> dict[str, Any]:
                 "provider": threat.title_vi_provider,
                 "cached": True,
             }
-        threat.title_vi_status = Threat.TitleViStatus.PENDING
-        threat.title_vi_provider = "awaiting_google"
-        threat.save(
-            update_fields=["title_vi_status", "title_vi_provider", "updated_at"]
+        provider = _persist_original_title_fallback(
+            threat, reason="google_unavailable"
         )
-        return {"id": threat.id, "status": "pending", "provider": "awaiting_google"}
+        return {"id": threat.id, "status": "failed", "provider": provider}
 
     if isinstance(google_result, GoogleTitleTranslation):
         draft = google_result.text
@@ -1920,12 +1930,8 @@ def translate_threat(threat: Threat, *, force: bool = False) -> dict[str, Any]:
         rescued = _try_ai_fallback(threat, title)
         if rescued:
             return {"id": threat.id, "status": "ok", "provider": rescued}
-        threat.title_vi_status = Threat.TitleViStatus.PENDING
-        threat.title_vi_provider = "awaiting_google"
-        threat.save(
-            update_fields=["title_vi_status", "title_vi_provider", "updated_at"]
-        )
-        return {"id": threat.id, "status": "pending", "provider": "awaiting_google"}
+        provider = _persist_original_title_fallback(threat, reason="placeholder")
+        return {"id": threat.id, "status": "failed", "provider": provider}
 
     google_needs_rescue = google_draft_needs_ollama(title, draft)
 
@@ -1943,18 +1949,10 @@ def translate_threat(threat: Threat, *, force: bool = False) -> dict[str, Any]:
                 "provider": threat.title_vi_provider,
                 "cached": True,
             }
-        threat.title_vi_status = Threat.TitleViStatus.PENDING
-        threat.title_vi_provider = "awaiting_quality_rescue"
-        threat.title_vi = ""
-        threat.save(
-            update_fields=[
-                "title_vi",
-                "title_vi_status",
-                "title_vi_provider",
-                "updated_at",
-            ]
+        provider = _persist_original_title_fallback(
+            threat, reason="quality_rescue"
         )
-        return {"id": threat.id, "status": "pending", "provider": "awaiting_quality_rescue"}
+        return {"id": threat.id, "status": "failed", "provider": provider}
 
     # Persist only a quality-checked Google draft so Wire never shows a known
     # bad translation while a rescue is pending.
