@@ -109,7 +109,7 @@ export default function IntelligencePage() {
     <Stack spacing={2}>
       <PageHeader
         title="AI & MISP"
-        subtitle="Daily briefings, entity extraction, and MISP import/export. Keys stay in server .env only."
+        subtitle="Tạo bản tin, trích xuất thực thể và đồng bộ MISP."
         action={
           <Button variant="outlined" onClick={load}>
             Refresh

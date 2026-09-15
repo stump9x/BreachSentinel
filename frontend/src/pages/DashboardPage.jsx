@@ -65,7 +65,7 @@ export default function DashboardPage() {
     <Stack spacing={1}>
       <PageHeader
         title="Overview"
-        subtitle="Live counts across IOCs, The Wire, leaks, and stealer credentials."
+        subtitle="Tổng quan IOC, The Wire, dữ liệu rò rỉ và thông tin đăng nhập."
         action={
           <Button component={RouterLink} to="/osint" variant="contained">
             Run OSINT scan

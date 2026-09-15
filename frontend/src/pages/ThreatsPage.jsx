@@ -157,7 +157,7 @@ export default function ThreatsPage() {
     <Stack spacing={2}>
       <PageHeader
         title="The Wire"
-        subtitle={`Live RSS — impact intel last ${WIRE_MAX_AGE_DAYS} days; Vietnam kept on The Wire (pinned when ≤${WIRE_VIETNAM_PIN_DAYS} days old). Breaches, leaks, ransomware prioritized.`}
+        subtitle={`Tin tình báo mới; ưu tiên sự cố, rò rỉ và ransomware. Vietnam được ghim tối đa ${WIRE_VIETNAM_PIN_DAYS} ngày.`}
         action={
           <Stack direction="row" spacing={1} alignItems="center">
             <Button component={RouterLink} to="/feeds" variant="outlined" size="small">

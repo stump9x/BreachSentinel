@@ -194,7 +194,7 @@ export default function DarkWebInvestigationsPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Dark Web Investigations"
-        subtitle="Staff-only Tor collection with bounded scraping, persisted evidence and source-grounded analysis."
+        subtitle="Thu thập có kiểm soát qua Tor và phân tích dựa trên bằng chứng."
         action={<PolicyOutlinedIcon color="primary" />}
       />
       <Alert severity="info">

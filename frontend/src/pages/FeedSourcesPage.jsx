@@ -107,7 +107,7 @@ export default function FeedSourcesPage() {
     <Stack spacing={2}>
       <PageHeader
         title="RSS Sources"
-        subtitle="Watcher-style CERT / breach / news feeds. Add more anytime — Celery sweeps active sources every 5 minutes."
+        subtitle="Nguồn CERT, sự cố và tin bảo mật; tự cập nhật mỗi 5 phút."
         action={
           <Stack direction="row" spacing={1}>
             <Button variant="outlined" disabled={busy} onClick={queueIngest}>

@@ -185,7 +185,7 @@ export default function OsintPage() {
     <Stack spacing={2}>
       <PageHeader
         title="OSINT Scan"
-        subtitle="Username footprint (Go) + open-web leak hunt (DDG/Brave/Bing + GitLab/npm/SO + X/Reddit + Ahmia onion index). GitHub → GitHub Scanner."
+        subtitle="Tìm dấu vết username và dữ liệu rò rỉ trên web."
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
 

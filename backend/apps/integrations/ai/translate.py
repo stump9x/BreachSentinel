@@ -112,6 +112,10 @@ _DEFACEMENT_TITLE_RE = re.compile(
     r"^Defacement\s+by\s+(?P<actor>[^:]+):\s*(?P<target>.+?)\s*$",
     re.IGNORECASE,
 )
+_CVE_NO_SUMMARY_RE = re.compile(
+    r"^(?P<cve>CVE-\d{4}-\d+):\s*(?:No\s+summary|No\s+description)\s*$",
+    re.IGNORECASE,
+)
 
 _VIET_CHAR_RE = re.compile(
     r"[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡ"
@@ -646,6 +650,9 @@ def rule_translate_title(title: str) -> str | None:
         return None
     if looks_vietnamese(raw):
         return raw
+    match = _CVE_NO_SUMMARY_RE.match(raw)
+    if match:
+        return f"{match.group('cve').upper()}: Chưa có mô tả"[:512]
     match = _RANSOMWARE_TITLE_RE.match(raw)
     if match:
         victim = match.group("victim").strip()
@@ -667,6 +674,10 @@ def is_structured_ransomware_title(title: str) -> bool:
 
 def is_structured_defacement_title(title: str) -> bool:
     return bool(_DEFACEMENT_TITLE_RE.match((title or "").strip()))
+
+
+def is_structured_cve_title(title: str) -> bool:
+    return bool(_CVE_NO_SUMMARY_RE.match((title or "").strip()))
 
 
 def reset_google_circuit() -> None:
@@ -1397,6 +1408,20 @@ def apply_inline_rule_translation(threat: Threat) -> bool:
         )
         return True
 
+    ruled = rule_translate_title(title)
+    if ruled and (
+        is_structured_ransomware_title(title)
+        or is_structured_defacement_title(title)
+        or is_structured_cve_title(title)
+    ):
+        _persist_translation(
+            threat,
+            title_vi=ruled,
+            status=Threat.TitleViStatus.RULE,
+            provider="rule",
+        )
+        return True
+
     hit = cached_translation(title)
     if hit:
         _persist_translation(
@@ -1404,18 +1429,6 @@ def apply_inline_rule_translation(threat: Threat) -> bool:
             title_vi=hit.title_vi,
             status=hit.title_vi_status,
             provider=f"cache:{hit.title_vi_provider}"[:64],
-        )
-        return True
-
-    ruled = rule_translate_title(title)
-    if ruled and (
-        is_structured_ransomware_title(title) or _DEFACEMENT_TITLE_RE.match(title.strip())
-    ):
-        _persist_translation(
-            threat,
-            title_vi=ruled,
-            status=Threat.TitleViStatus.RULE,
-            provider="rule",
         )
         return True
 
@@ -1494,6 +1507,7 @@ def _should_force_retranslate(threat: Threat) -> bool:
     if (
         is_structured_ransomware_title(threat.title or "")
         or is_structured_defacement_title(threat.title or "")
+        or is_structured_cve_title(threat.title or "")
     ) and (
         threat.title_vi_status == Threat.TitleViStatus.RULE
         or str(threat.title_vi_provider or "") == "rule"
@@ -1507,8 +1521,10 @@ def _should_force_retranslate(threat: Threat) -> bool:
         return True
     if threat.title_vi_status != Threat.TitleViStatus.RULE:
         return False
-    if is_structured_ransomware_title(threat.title or "") or is_structured_defacement_title(
-        threat.title or ""
+    if (
+        is_structured_ransomware_title(threat.title or "")
+        or is_structured_defacement_title(threat.title or "")
+        or is_structured_cve_title(threat.title or "")
     ):
         return False
     return True

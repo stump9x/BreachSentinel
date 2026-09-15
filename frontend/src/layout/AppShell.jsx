@@ -84,7 +84,7 @@ export default function AppShell() {
       <Box sx={{ px: 2, py: 2.25, display: "flex", alignItems: "center", gap: 1 }}>
         <ShieldOutlinedIcon sx={{ color: "primary.main" }} />
         <Typography variant="h6" sx={{ color: "primary.main", letterSpacing: "-0.02em" }}>
-          BreachSentinel
+          TS DLLL
         </Typography>
       </Box>
       <Divider />

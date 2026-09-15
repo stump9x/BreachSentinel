@@ -45,12 +45,11 @@ export default function LoginPage() {
           <Stack direction="row" spacing={1.5} alignItems="center">
             <ShieldOutlinedIcon sx={{ color: "primary.main", fontSize: 42 }} />
             <Typography variant="h3" sx={{ color: "primary.main" }}>
-              BreachSentinel
+              TS DLLL
             </Typography>
           </Stack>
           <Typography color="text.secondary">
-            Sign in with your local analyst account to access threat intelligence
-            consoles.
+            Đăng nhập bằng tài khoản phân tích nội bộ để truy cập hệ thống tình báo.
           </Typography>
           {error ? <Alert severity="error">{error}</Alert> : null}
           <TextField

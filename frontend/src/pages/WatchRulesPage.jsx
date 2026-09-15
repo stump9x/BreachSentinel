@@ -85,7 +85,7 @@ export default function WatchRulesPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Watch Rules"
-        subtitle="Keyword alerts across The Wire, leaks, and indicators. Target 'searx' or 'leaks' also drives periodic SearxNG metasearch (GitHub/GitLab/…)."
+        subtitle="Cảnh báo từ khóa trên The Wire, dữ liệu rò rỉ và IOC."
         action={
           <Stack direction="row" spacing={1}>
             <Button
