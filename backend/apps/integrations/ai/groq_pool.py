@@ -293,8 +293,10 @@ def groq_chat_completion(
         if max_attempts is not None
         else (getattr(settings, "GROQ_MAX_KEY_ATTEMPTS", 2) or 2)
     )
-    # Never burn the whole pool in one request.
-    attempt_cap = max(1, min(attempt_cap, len(ready), 3))
+    # Rotate through a meaningful slice of the pool so newly-added keys can
+    # rescue a batch when older keys are rate-limited.  Keep a hard cap to
+    # avoid hammering every key on a single title.
+    attempt_cap = max(1, min(attempt_cap, len(ready), 8))
     stop_on_429 = bool(getattr(settings, "GROQ_STOP_ON_FIRST_429", True))
     url = "https://api.groq.com/openai/v1/chat/completions"
     body = {
@@ -303,6 +305,11 @@ def groq_chat_completion(
         "max_tokens": max_tokens,
         "messages": messages,
     }
+    # GPT-OSS can spend the whole small completion budget on hidden reasoning,
+    # leaving message.content empty.  Translation needs only the final answer;
+    # disable reasoning for this model family to avoid false empty-text failures.
+    if str(model).casefold().startswith("openai/gpt-oss"):
+        body["include_reasoning"] = False
 
     errors: list[str] = []
     attempted: set[str] = set()
