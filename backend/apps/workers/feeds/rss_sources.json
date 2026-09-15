@@ -2059,5 +2059,68 @@
     "confidence": 1,
     "category": "news",
     "notes": "watcher"
+  },
+  {
+    "name": "research-checkpoint",
+    "url": "https://research.checkpoint.com/feed/",
+    "country": "Israel",
+    "country_code": "IL",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "gbhackers",
+    "url": "https://gbhackers.com/feed/",
+    "country": "Global",
+    "country_code": "ZZ",
+    "confidence": 3,
+    "category": "news",
+    "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "microsoft-security-blog",
+    "url": "https://www.microsoft.com/en-us/security/blog/feed/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "huntress",
+    "url": "https://www.huntress.com/blog/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "varonis",
+    "url": "https://www.varonis.com/blog/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "rapid7",
+    "url": "https://www.rapid7.com/blog/rss/",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "wiz",
+    "url": "https://www.wiz.io/blog/rss.xml",
+    "country": "United States",
+    "country_code": "US",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
   }
 ]
