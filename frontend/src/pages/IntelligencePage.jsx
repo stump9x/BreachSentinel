@@ -109,7 +109,6 @@ export default function IntelligencePage() {
     <Stack spacing={2}>
       <PageHeader
         title="AI & MISP"
-        subtitle="Tạo bản tin, trích xuất thực thể và đồng bộ MISP."
         action={
           <Button variant="outlined" onClick={load}>
             Refresh

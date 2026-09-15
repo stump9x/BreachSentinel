@@ -88,7 +88,6 @@ export default function IndicatorsPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Indicators"
-        subtitle="IOC từ feed, log stealer và OSINT."
         action={
           <Button variant="contained" onClick={() => setOpen(true)}>
             Add IOC

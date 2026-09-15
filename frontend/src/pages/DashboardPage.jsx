@@ -63,7 +63,6 @@ export default function DashboardPage() {
     <Stack spacing={1}>
       <PageHeader
         title="Overview"
-        subtitle="Tổng quan IOC, The Wire, dữ liệu rò rỉ và thông tin đăng nhập."
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
       <KpiStrip

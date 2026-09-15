@@ -1310,7 +1310,6 @@ export default function LogsScannerPage() {
       <Box>
         <PageHeader
           title="Logs Scanner"
-          subtitle="Chỉ dành cho nhân viên — tải lên và quét log theo từ khóa."
         />
         <Alert severity="warning">Staff access required.</Alert>
       </Box>

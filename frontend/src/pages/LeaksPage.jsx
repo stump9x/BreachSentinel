@@ -43,7 +43,6 @@ export default function LeaksPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Data Leaks"
-        subtitle="Sự cố, thông tin đăng nhập bị lộ và dữ liệu công khai."
         action={
           <Stack direction="row" spacing={1}>
             <Button

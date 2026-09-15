@@ -63,7 +63,6 @@ export default function WorkersPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Workers"
-        subtitle="Chạy tác vụ Celery cho log stealer và feed tình báo."
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
       {msg ? <Alert severity="success">{msg}</Alert> : null}

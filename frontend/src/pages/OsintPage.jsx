@@ -185,7 +185,6 @@ export default function OsintPage() {
     <Stack spacing={2}>
       <PageHeader
         title="OSINT Scan"
-        subtitle="Tìm dấu vết username và dữ liệu rò rỉ trên web."
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
 

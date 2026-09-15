@@ -6,7 +6,6 @@ export default function PolicyPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Chính sách"
-        subtitle="Cách The Wire thu thập, lọc và cập nhật dữ liệu tình báo."
       />
 
       <Alert severity="info">

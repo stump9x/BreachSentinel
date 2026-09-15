@@ -194,7 +194,6 @@ export default function DarkWebInvestigationsPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Dark Web"
-        subtitle="Thu thập có kiểm soát qua Tor và phân tích dựa trên bằng chứng."
         action={<PolicyOutlinedIcon color="primary" />}
       />
       {error ? <Alert severity="error">{error}</Alert> : null}

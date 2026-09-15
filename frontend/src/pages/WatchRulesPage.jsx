@@ -85,7 +85,6 @@ export default function WatchRulesPage() {
     <Stack spacing={2}>
       <PageHeader
         title="Watch Rules"
-        subtitle="Cảnh báo từ khóa trên The Wire, dữ liệu rò rỉ và IOC."
         action={
           <Stack direction="row" spacing={1}>
             <Button

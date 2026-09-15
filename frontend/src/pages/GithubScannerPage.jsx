@@ -340,7 +340,6 @@ export default function GithubScannerPage() {
     <Stack spacing={2}>
       <PageHeader
         title="GitHub Scanner"
-        subtitle={`Tìm từ khóa trong repository (tối đa ${FIXED_MAX_FILES} file); xem đường dẫn và số dòng.`}
         action={<GitHubIcon color="primary" />}
       />
       {configured === false ? (
