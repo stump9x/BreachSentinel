@@ -49,7 +49,14 @@ export default function FeedSourcesPage() {
       const data = await api.get(
         "/api/v1/feed-sources/?page_size=500&ordering=confidence,name"
       );
-      setRows(data.results || []);
+      const nextRows = [...(data.results || [])].sort((a, b) => {
+        const activeDiff = Number(!!b.is_active) - Number(!!a.is_active);
+        if (activeDiff) return activeDiff;
+        const confidenceDiff = Number(a.confidence || 5) - Number(b.confidence || 5);
+        if (confidenceDiff) return confidenceDiff;
+        return String(a.name || a.url || "").localeCompare(String(b.name || b.url || ""));
+      });
+      setRows(nextRows);
       setTotalCount(data.count ?? (data.results || []).length);
     } catch (err) {
       setError(err.message || "Failed to load feed sources");
@@ -160,7 +167,7 @@ export default function FeedSourcesPage() {
       ) : null}
 
       <Typography variant="body2" color="text.secondary">
-        Active: {rows.filter((r) => r.is_active).length}
+        Active: {rows.filter((r) => r.is_active).length} / {totalCount || rows.length}
       </Typography>
 
       <DataTable
