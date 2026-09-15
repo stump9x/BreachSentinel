@@ -2122,5 +2122,14 @@
     "confidence": 2,
     "category": "news",
     "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "infrahunter",
+    "url": "https://infrahunter.com/rss.xml",
+    "country": "Global",
+    "country_code": "ZZ",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated RSS endpoint"
   }
 ]
