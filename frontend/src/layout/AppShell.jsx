@@ -21,10 +21,7 @@ import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
 import CellTowerOutlinedIcon from "@mui/icons-material/CellTowerOutlined";
 import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
-import TravelExploreOutlinedIcon from "@mui/icons-material/TravelExploreOutlined";
-import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import RssFeedOutlinedIcon from "@mui/icons-material/RssFeedOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import GitHubIcon from "@mui/icons-material/GitHub";
@@ -37,17 +34,15 @@ const DRAWER_WIDTH = 232;
 
 const NAV = [
   { to: "/", label: "Overview", icon: <DashboardOutlinedIcon fontSize="small" /> },
-  { to: "/indicators", label: "Indicators", icon: <DnsOutlinedIcon fontSize="small" /> },
   { to: "/threats", label: "The Wire", icon: <CellTowerOutlinedIcon fontSize="small" /> },
   { to: "/feeds", label: "RSS Sources", icon: <RssFeedOutlinedIcon fontSize="small" /> },
   { to: "/leaks", label: "Data Leaks", icon: <WaterDropOutlinedIcon fontSize="small" /> },
-  { to: "/osint", label: "OSINT Scan", icon: <TravelExploreOutlinedIcon fontSize="small" /> },
   { to: "/logs-scanner", label: "Logs Scanner", icon: <DocumentScannerOutlinedIcon fontSize="small" /> },
   { to: "/dark-web", label: "Dark Web", icon: <PolicyOutlinedIcon fontSize="small" /> },
   { to: "/github-scanner", label: "GitHub Scanner", icon: <GitHubIcon fontSize="small" /> },
-  { to: "/workers", label: "Workers", icon: <BoltOutlinedIcon fontSize="small" /> },
-  { to: "/watch-rules", label: "Watch Rules", icon: <VisibilityOutlinedIcon fontSize="small" /> },
-  { to: "/intelligence", label: "AI & MISP", icon: <AutoAwesomeOutlinedIcon fontSize="small" /> },
+  { to: "/intelligence", label: "Tóm tắt AI", icon: <AutoAwesomeOutlinedIcon fontSize="small" /> },
+  { to: "/policy", label: "Chính sách", icon: <PolicyOutlinedIcon fontSize="small" /> },
+  { to: "/indicators", label: "Indicators", icon: <DnsOutlinedIcon fontSize="small" /> },
 ];
 
 export default function AppShell() {

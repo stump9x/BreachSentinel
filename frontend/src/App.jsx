@@ -14,6 +14,7 @@ import FeedSourcesPage from "./pages/FeedSourcesPage";
 import GithubScannerPage from "./pages/GithubScannerPage";
 import LogsScannerPage from "./pages/LogsScannerPage";
 import DarkWebInvestigationsPage from "./pages/DarkWebInvestigationsPage";
+import PolicyPage from "./pages/PolicyPage";
 
 function PublicOnly({ children }) {
   const { authed } = useAuth();
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/github-scanner" element={<GithubScannerPage />} />
         <Route path="/logs-scanner" element={<LogsScannerPage />} />
         <Route path="/dark-web" element={<DarkWebInvestigationsPage />} />
+        <Route path="/policy" element={<PolicyPage />} />
         <Route path="/workers" element={<WorkersPage />} />
         <Route path="/watch-rules" element={<WatchRulesPage />} />
         <Route path="/intelligence" element={<IntelligencePage />} />

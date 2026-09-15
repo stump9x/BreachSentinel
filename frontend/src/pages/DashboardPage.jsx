@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { Alert, Stack, Typography } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
-import Button from "@mui/material/Button";
 import { api } from "../api/client";
 import { KpiStrip } from "../components/KpiStrip";
 import { PageHeader } from "../components/PageHeader";
@@ -66,11 +64,6 @@ export default function DashboardPage() {
       <PageHeader
         title="Overview"
         subtitle="Tổng quan IOC, The Wire, dữ liệu rò rỉ và thông tin đăng nhập."
-        action={
-          <Button component={RouterLink} to="/osint" variant="contained">
-            Run OSINT scan
-          </Button>
-        }
       />
       {error ? <Alert severity="error">{error}</Alert> : null}
       <KpiStrip
@@ -91,7 +84,7 @@ export default function DashboardPage() {
       <DataTable
         loading={loading}
         rows={recentThreats}
-        empty="No threat items yet — ingest feeds from Workers."
+        empty="No threat items yet — cập nhật từ RSS Sources và các bộ thu thập đang bật."
         columns={[
           {
             id: "title",

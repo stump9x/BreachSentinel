@@ -193,13 +193,10 @@ export default function DarkWebInvestigationsPage() {
   return (
     <Stack spacing={2}>
       <PageHeader
-        title="Dark Web Investigations"
+        title="Dark Web"
         subtitle="Thu thập có kiểm soát qua Tor và phân tích dựa trên bằng chứng."
         action={<PolicyOutlinedIcon color="primary" />}
       />
-      <Alert severity="info">
-        Defensive intelligence use only. The collector accepts analyst search terms, but fetches only validated v3 .onion links returned by configured search engines.
-      </Alert>
       {error ? <Alert severity="error">{error}</Alert> : null}
       {notice ? <Alert severity="success">{notice}</Alert> : null}
 
