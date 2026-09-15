@@ -222,6 +222,15 @@ def normalize_ollama_content_terms(text: str) -> str:
         normalized = pattern.sub(replacement, normalized)
     return " ".join(normalized.split())
 
+
+def deterministic_cti_term_fallback(title: str) -> str:
+    """Translate only well-known CTI heading terms when Ollama cannot answer."""
+    source = prepare_title_for_translate(title)
+    translated = normalize_ollama_content_terms(source)
+    if translated.casefold() == source.casefold() or not looks_vietnamese(translated):
+        return ""
+    return translated[:512]
+
 # Adapted from NewsCrawler military doctrine + CTI Wire title constraints.
 _CTI_WIRE_TRANSLATION_DOCTRINE = """
 ## Role
@@ -1372,6 +1381,12 @@ def ollama_translate_title(title: str) -> str:
         if accept_ollama_translation(title, text):
             return text[:512]
         last_error = TitleTranslateError("Ollama fallback failed validation")
+    deterministic = deterministic_cti_term_fallback(title)
+    if deterministic and accept_ollama_translation(title, deterministic):
+        logger.info(
+            "Ollama output rejected; using deterministic CTI term fallback"
+        )
+        return deterministic
     raise TitleTranslateError(
         f"Ollama fallback failed: {last_error or 'invalid output'}"
     )
