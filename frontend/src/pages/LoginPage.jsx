@@ -48,9 +48,6 @@ export default function LoginPage() {
               TS DLLL
             </Typography>
           </Stack>
-          <Typography color="text.secondary">
-            Đăng nhập bằng tài khoản phân tích nội bộ để truy cập hệ thống tình báo.
-          </Typography>
           {error ? <Alert severity="error">{error}</Alert> : null}
           <TextField
             label="Username"
