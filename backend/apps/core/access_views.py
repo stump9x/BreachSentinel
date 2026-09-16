@@ -72,7 +72,7 @@ class AccessRequestActionView(APIView):
         try:
             access_request = (
                 AccessRequest.objects.select_for_update()
-                .select_related("user", "reviewed_by")
+                .select_related("user")
                 .get(pk=pk)
             )
         except AccessRequest.DoesNotExist:
