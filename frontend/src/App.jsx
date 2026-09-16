@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import AppShell from "./layout/AppShell";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import IndicatorsPage from "./pages/IndicatorsPage";
 import ThreatsPage from "./pages/ThreatsPage";
@@ -15,10 +16,18 @@ import GithubScannerPage from "./pages/GithubScannerPage";
 import LogsScannerPage from "./pages/LogsScannerPage";
 import DarkWebInvestigationsPage from "./pages/DarkWebInvestigationsPage";
 import PolicyPage from "./pages/PolicyPage";
+import AccessManagementPage from "./pages/AccessManagementPage";
 
 function PublicOnly({ children }) {
   const { authed } = useAuth();
   if (authed) return <Navigate to="/" replace />;
+  return children;
+}
+
+function SuperuserOnly({ children }) {
+  const { isSuperuser, profileLoading } = useAuth();
+  if (profileLoading) return null;
+  if (!isSuperuser) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -30,6 +39,14 @@ export default function App() {
         element={
           <PublicOnly>
             <LoginPage />
+          </PublicOnly>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <PublicOnly>
+            <RegisterPage />
           </PublicOnly>
         }
       />
@@ -47,6 +64,14 @@ export default function App() {
         <Route path="/workers" element={<WorkersPage />} />
         <Route path="/watch-rules" element={<WatchRulesPage />} />
         <Route path="/intelligence" element={<IntelligencePage />} />
+        <Route
+          path="/access-management"
+          element={
+            <SuperuserOnly>
+              <AccessManagementPage />
+            </SuperuserOnly>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

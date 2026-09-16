@@ -161,6 +161,7 @@ REST_FRAMEWORK = {
         "anon": "60/min",
         "user": "300/min",
         "auth": "20/min",
+        "registration": "3/hour",
         "github_scan_create": "5/hour",
         "darkweb_investigation_create": "6/hour",
         "log_scan_create": "30/hour",

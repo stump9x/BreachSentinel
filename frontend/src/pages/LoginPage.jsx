@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 export default function LoginPage() {
@@ -68,6 +69,9 @@ export default function LoginPage() {
           />
           <Button type="submit" variant="contained" disabled={busy || !username || !password}>
             {busy ? "Authenticating…" : "Enter console"}
+          </Button>
+          <Button component={RouterLink} to="/register" variant="outlined">
+            Tạo tài khoản
           </Button>
         </Stack>
       </Container>

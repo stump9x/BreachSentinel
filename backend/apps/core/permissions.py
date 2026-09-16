@@ -11,3 +11,13 @@ class IsStaffUser(BasePermission):
     def has_permission(self, request, view) -> bool:
         user = request.user
         return bool(user and user.is_authenticated and user.is_staff)
+
+
+class IsSuperUser(BasePermission):
+    """Account approval and other root administration operations."""
+
+    message = "Administrator privileges required for this action."
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_superuser)

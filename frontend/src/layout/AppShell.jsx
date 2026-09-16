@@ -27,6 +27,7 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import DocumentScannerOutlinedIcon from "@mui/icons-material/DocumentScannerOutlined";
 import PolicyOutlinedIcon from "@mui/icons-material/PolicyOutlined";
+import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import { useAuth } from "../auth/AuthContext";
 import { loadNavOpenPreference, writeNavOpenPreference } from "./navPreference";
 
@@ -41,12 +42,18 @@ const NAV = [
   { to: "/dark-web", label: "Dark Web", icon: <PolicyOutlinedIcon fontSize="small" /> },
   { to: "/github-scanner", label: "GitHub Scanner", icon: <GitHubIcon fontSize="small" /> },
   { to: "/intelligence", label: "Tóm tắt AI", icon: <AutoAwesomeOutlinedIcon fontSize="small" /> },
+  {
+    to: "/access-management",
+    label: "Quản lý truy cập",
+    icon: <ManageAccountsOutlinedIcon fontSize="small" />,
+    superuserOnly: true,
+  },
   { to: "/policy", label: "Chính sách", icon: <PolicyOutlinedIcon fontSize="small" /> },
   { to: "/indicators", label: "Indicators", icon: <DnsOutlinedIcon fontSize="small" /> },
 ];
 
 export default function AppShell() {
-  const { authed, username, logout } = useAuth();
+  const { authed, username, isSuperuser, logout } = useAuth();
   const location = useLocation();
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
@@ -84,7 +91,7 @@ export default function AppShell() {
       </Box>
       <Divider />
       <List sx={{ px: 1, py: 1.5, flex: 1 }}>
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.superuserOnly || isSuperuser).map((item) => {
           const selected =
             item.to === "/"
               ? location.pathname === "/"

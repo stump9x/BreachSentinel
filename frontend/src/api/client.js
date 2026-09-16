@@ -236,8 +236,21 @@ export async function loginWithPassword(username, password) {
   return {
     username: data.username || username,
     is_staff: Boolean(data.is_staff),
+    is_superuser: Boolean(data.is_superuser),
     expires_in_hours: data.expires_in_hours,
   };
+}
+
+export async function registerAccount(username, password, passwordConfirm) {
+  return apiRequest("/api/v1/auth/register/", {
+    method: "POST",
+    body: {
+      username,
+      password,
+      password_confirm: passwordConfirm,
+    },
+    auth: false,
+  });
 }
 
 export async function logoutRemote() {
