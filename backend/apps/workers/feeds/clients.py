@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import re
+from datetime import datetime, timezone as dt_timezone
+from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from django.conf import settings
@@ -175,6 +178,106 @@ def _is_terminal_feed_error(error: str) -> bool:
 def _looks_like_rss_or_atom(body: str) -> bool:
     head = (body or "")[:800].lstrip().lower()
     return head.startswith("<?xml") or "<rss" in head or "<feed" in head
+
+
+def _is_wokb_apt_source(url: str) -> bool:
+    """Return whether a URL is the supported Wokb APT HTML feed."""
+    parsed = urlparse(str(url or ""))
+    return (
+        (parsed.hostname or "").lower().removeprefix("www.") == "wokb.cz"
+        and parsed.path.rstrip("/").casefold() == "/blog/apt_blog.html"
+    )
+
+
+class _WokbTableParser(HTMLParser):
+    """Small, dependency-free parser for Wokb's five-column APT table."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[list[dict[str, Any]]] = []
+        self._row: list[dict[str, Any]] | None = None
+        self._cell: dict[str, Any] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag = tag.casefold()
+        if tag == "tr":
+            self._row = []
+        elif tag in {"td", "th"} and self._row is not None:
+            self._cell = {"text": [], "links": []}
+        elif tag == "a" and self._cell is not None:
+            href = dict(attrs).get("href")
+            if href:
+                self._cell["links"].append(href)
+
+    def handle_data(self, data: str) -> None:
+        if self._cell is not None:
+            self._cell["text"].append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.casefold()
+        if (
+            tag in {"td", "th"}
+            and self._row is not None
+            and self._cell is not None
+        ):
+            self._cell["text"] = " ".join(
+                "".join(self._cell["text"]).split()
+            )
+            self._row.append(self._cell)
+            self._cell = None
+        elif tag == "tr" and self._row is not None:
+            if self._row:
+                self.rows.append(self._row)
+            self._row = None
+            self._cell = None
+
+
+def _parse_wokb_apt_items(
+    body: str,
+    *,
+    source_url: str,
+    limit: int,
+) -> list[dict[str, str]]:
+    parser = _WokbTableParser()
+    parser.feed(body or "")
+    output: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for cells in parser.rows:
+        if len(cells) < 3:
+            continue
+        date_text = str(cells[0].get("text") or "").strip()
+        if not re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{2,4}", date_text):
+            continue
+        title = str(cells[1].get("text") or "").strip()
+        links = list(cells[1].get("links") or [])
+        if not title or not links:
+            continue
+        link = urljoin(source_url, str(links[0]))
+        if link in seen:
+            continue
+        seen.add(link)
+        try:
+            date_format = (
+                "%d.%m.%Y"
+                if len(date_text.rsplit(".", 1)[-1]) == 4
+                else "%d.%m.%y"
+            )
+            published = datetime.strptime(date_text, date_format).replace(
+                tzinfo=dt_timezone.utc
+            ).isoformat()
+        except ValueError:
+            published = ""
+        output.append(
+            {
+                "title": title,
+                "link": link,
+                "summary": str(cells[2].get("text") or "").strip(),
+                "published": published,
+            }
+        )
+        if len(output) >= limit:
+            break
+    return output
 
 
 def _should_retry_via_tor(exc: BaseException) -> bool:
@@ -545,12 +648,21 @@ def fetch_cert_rss_feeds(
             str(feed.get("http_last_modified") or "") if cache_is_current else ""
         )
         try:
-            raw, meta, used_tor = fetch_feed_body_with_tor_fallback(
-                url,
-                prefer_tor=prefer_tor,
-                etag=request_etag,
-                last_modified=request_last_modified,
-            )
+            if _is_wokb_apt_source(url):
+                raw, meta = _fetch_rss_body(
+                    url,
+                    etag=request_etag,
+                    last_modified=request_last_modified,
+                    via_tor=False,
+                )
+                used_tor = False
+            else:
+                raw, meta, used_tor = fetch_feed_body_with_tor_fallback(
+                    url,
+                    prefer_tor=prefer_tor,
+                    etag=request_etag,
+                    last_modified=request_last_modified,
+                )
         except httpx.HTTPError as exc:
             logger.warning("RSS feed %s failed: %s", name, exc)
             _mark_feed_status(feed, status="error", error=str(exc)[:500])
@@ -603,15 +715,32 @@ def fetch_cert_rss_feeds(
             )
             continue
 
-        try:
-            root = ET.fromstring(raw)
-        except ET.ParseError as exc:
-            logger.warning("RSS feed %s XML parse error: %s", name, exc)
-            _mark_feed_status(feed, status="error", error=str(exc))
-            continue
+        html_items: list[dict[str, str]] | None = None
+        if _is_wokb_apt_source(url):
+            html_items = _parse_wokb_apt_items(
+                raw,
+                source_url=url,
+                limit=limit_per_feed,
+            )
+            if not html_items:
+                logger.warning("Wokb APT page no longer matches its expected table")
+                _mark_feed_status(
+                    feed,
+                    status="error",
+                    error="wokb_html_table_not_found",
+                )
+                continue
+            root = None
+        else:
+            try:
+                root = ET.fromstring(raw)
+            except ET.ParseError as exc:
+                logger.warning("RSS feed %s XML parse error: %s", name, exc)
+                _mark_feed_status(feed, status="error", error=str(exc))
+                continue
 
         ns = {"atom": "http://www.w3.org/2005/Atom"}
-        is_wordpress = any(
+        is_wordpress = root is not None and any(
             child.tag.endswith("generator")
             and "wordpress" in (child.text or "").casefold()
             for child in root.iter()
@@ -622,13 +751,15 @@ def fetch_cert_rss_feeds(
             parsed_site = urlparse(site_link)
             if parsed_site.scheme in {"http", "https"} and parsed_site.hostname:
                 wordpress_site_url = site_link
-        items = root.findall(".//item")
-        if not items:
+        items = [] if root is None else root.findall(".//item")
+        if root is not None and not items:
             items = root.findall(".//atom:entry", ns)
 
         feed_count = 0
-        for node in items[:limit_per_feed]:
+        for node in (html_items or items[:limit_per_feed]):
             def _text(paths: list[str]) -> str:
+                if isinstance(node, dict):
+                    return str(node.get(paths[0]) or "")
                 for p in paths:
                     el = node.find(p)
                     if el is None:
@@ -641,7 +772,7 @@ def fetch_cert_rss_feeds(
 
             title = _text(["title", "atom:title"])
             link = _text(["link", "atom:link"])
-            if not link:
+            if not link and not isinstance(node, dict):
                 link_el = node.find("link") or node.find("atom:link", ns)
                 if link_el is not None:
                     link = link_el.get("href") or (link_el.text or "")

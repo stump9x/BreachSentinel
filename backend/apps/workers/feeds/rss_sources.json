@@ -2131,5 +2131,14 @@
     "confidence": 2,
     "category": "news",
     "notes": "validated RSS endpoint"
+  },
+  {
+    "name": "wokb-apt-blog",
+    "url": "https://www.wokb.cz/Blog/apt_blog.html",
+    "country": "Czech Republic",
+    "country_code": "CZ",
+    "confidence": 2,
+    "category": "news",
+    "notes": "validated Wokb APT HTML source"
   }
 ]
