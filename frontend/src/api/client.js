@@ -174,6 +174,8 @@ export async function apiRequest(path, options = {}) {
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const response = await fetch(`${getApiBase()}${path}`, {
       method,
+      // Live intelligence must not be served from a browser's stale GET cache.
+      cache: method === "GET" ? "no-store" : undefined,
       headers,
       body:
         body === undefined

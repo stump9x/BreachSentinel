@@ -31,7 +31,6 @@ import { displayThreatTitle } from "../utils/threatTitle";
 
 const POLL_MS = 10000;
 const WIRE_MAX_AGE_DAYS = 7;
-const WIRE_VIETNAM_PIN_DAYS = 7;
 const PAGE_SIZE = 50;
 const VIEW_STORAGE_KEY = "wire.view";
 
@@ -51,7 +50,7 @@ function wireListQuery({ source, tag, page }) {
     wire_feed: true,
     page,
     page_size: PAGE_SIZE,
-    ordering: "-wire_sort_priority,-published_at,-id",
+    ordering: "-published_at,-wire_sort_priority,-id",
   });
 }
 
@@ -212,7 +211,7 @@ export default function ThreatsPage() {
         />
         <Typography variant="caption" color="text.secondary">
           {lastRefresh
-            ? `Updated ${lastRefresh.toLocaleTimeString()} · ${WIRE_MAX_AGE_DAYS}d / VN pin ${WIRE_VIETNAM_PIN_DAYS}d · ${totalCount} items`
+            ? `Updated ${lastRefresh.toLocaleTimeString()} · newest first · ${WIRE_MAX_AGE_DAYS}d general window · ${totalCount} items`
             : ""}
         </Typography>
       </Stack>

@@ -83,7 +83,7 @@ class ThreatViewSet(viewsets.ModelViewSet):
         "created_at",
         "id",
     )
-    ordering = ("-wire_sort_priority", "-published_at", "-id")
+    ordering = ("-published_at", "-wire_sort_priority", "-id")
 
     def get_queryset(self):
         from .filters import annotate_wire_sort_priority

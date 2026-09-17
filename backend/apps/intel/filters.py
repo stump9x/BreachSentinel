@@ -5,10 +5,11 @@ from .models import CompromisedCredential, DataLeak, Indicator, Threat, ThreatAc
 
 
 def annotate_wire_sort_priority(queryset):
-    """Pin fresh high-priority rows; decay older Vietnam pins off the top.
+    """Annotate time-decayed priority for explicit priority ordering.
 
     Vietnam stories stay in the feed indefinitely (see filter_wire_feed), but only
-    the last WIRE_VIETNAM_PIN_DAYS keep full ``wire_priority`` for ordering.
+    the last WIRE_VIETNAM_PIN_DAYS keep full ``wire_priority`` for tie-breaking
+    and callers that explicitly request priority ordering.
     Older high-priority rows are capped at WIRE_STALE_PRIORITY_CAP.
     """
     from datetime import timedelta
@@ -67,7 +68,7 @@ class ThreatFilter(django_filters.FilterSet):
         field_name="created_at", lookup_expr="gte"
     )
     # Dual window: Vietnam kept indefinitely; general Wire ≤ WIRE_MAX_AGE_DAYS.
-    # Vietnam pin-to-top is handled by wire_sort_priority (last WIRE_VIETNAM_PIN_DAYS).
+    # Vietnam stories may remain eligible longer; the default list sorts by date.
     wire_feed = django_filters.BooleanFilter(method="filter_wire_feed")
 
     class Meta:

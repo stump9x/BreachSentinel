@@ -87,8 +87,8 @@ const WIRE_PRIORITY_PIN_HOURS = 7 * 24;
 const WIRE_STALE_PRIORITY_CAP = 15;
 
 /**
- * Effective Wire sort priority: stale Vietnam/impact pins decay so brand-new
- * lower-priority headlines from Overview still land on Wire page 1.
+ * Effective priority for stories with the same timestamp. Older pins decay,
+ * but priority never outranks publication time in the default Wire view.
  */
 export function effectiveWirePriority(row, now = Date.now()) {
   const pri = Number(row?.wire_priority || 0);
@@ -99,12 +99,15 @@ export function effectiveWirePriority(row, now = Date.now()) {
   return Math.min(pri, WIRE_STALE_PRIORITY_CAP);
 }
 
-/** The Wire: effective priority first, then effective time. */
+/** The Wire: newest stories first; priority only breaks a time tie. */
 export function compareWireRows(a, b, now = Date.now()) {
+  const ta = wireDisplayInstantMs(a, now);
+  const tb = wireDisplayInstantMs(b, now);
+  if (tb !== ta) return tb - ta;
   const pa = effectiveWirePriority(a, now);
   const pb = effectiveWirePriority(b, now);
   if (pb !== pa) return pb - pa;
-  return compareByWireDisplayTime(a, b, now);
+  return (b.id || 0) - (a.id || 0);
 }
 
 export function formatDateWithRelative(iso, now = Date.now()) {
