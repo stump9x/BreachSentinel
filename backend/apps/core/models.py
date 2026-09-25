@@ -76,3 +76,39 @@ class AccessRequestAudit(models.Model):
 
     def __str__(self) -> str:
         return f"{self.access_request.user.username}: {self.action}"
+
+
+class PasswordResetRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="password_reset_request",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    new_password_hash = models.CharField(max_length=256, blank=True)
+    requested_at = models.DateTimeField(db_index=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_password_reset_requests",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-requested_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.user.username} ({self.status})"

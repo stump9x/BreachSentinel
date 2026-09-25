@@ -255,6 +255,18 @@ export async function registerAccount(username, password, passwordConfirm) {
   });
 }
 
+export async function requestPasswordReset(username, password, passwordConfirm) {
+  return apiRequest("/api/v1/auth/password-reset/", {
+    method: "POST",
+    body: {
+      username,
+      password,
+      password_confirm: passwordConfirm,
+    },
+    auth: false,
+  });
+}
+
 export async function logoutRemote() {
   try {
     if (hasAuth()) {

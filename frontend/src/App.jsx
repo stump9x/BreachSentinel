@@ -3,6 +3,7 @@ import { useAuth } from "./auth/AuthContext";
 import AppShell from "./layout/AppShell";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import IndicatorsPage from "./pages/IndicatorsPage";
 import ThreatsPage from "./pages/ThreatsPage";
@@ -47,6 +48,14 @@ export default function App() {
         element={
           <PublicOnly>
             <RegisterPage />
+          </PublicOnly>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicOnly>
+            <ForgotPasswordPage />
           </PublicOnly>
         }
       />

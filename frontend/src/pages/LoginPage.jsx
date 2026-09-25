@@ -73,6 +73,9 @@ export default function LoginPage() {
           <Button component={RouterLink} to="/register" variant="outlined">
             Tạo tài khoản
           </Button>
+          <Button component={RouterLink} to="/forgot-password" variant="text">
+            Quên mật khẩu?
+          </Button>
         </Stack>
       </Container>
     </Box>

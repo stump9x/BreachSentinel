@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AccessRequest, AccessRequestAudit
+from .models import AccessRequest, AccessRequestAudit, PasswordResetRequest
 
 
 @admin.register(AccessRequest)
@@ -32,6 +32,25 @@ class AccessRequestAuditAdmin(admin.ModelAdmin):
     @admin.display(ordering="access_request__user__username", description="Username")
     def username(self, obj):
         return obj.access_request.user.username
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PasswordResetRequest)
+class PasswordResetRequestAdmin(admin.ModelAdmin):
+    list_display = ("username", "status", "requested_at", "reviewed_by", "reviewed_at")
+    list_filter = ("status",)
+    search_fields = ("user__username",)
+    exclude = ("new_password_hash",)
+    readonly_fields = ("user", "status", "requested_at", "reviewed_by", "reviewed_at")
+
+    @admin.display(ordering="user__username", description="Username")
+    def username(self, obj):
+        return obj.user.username
 
     def has_add_permission(self, request):
         return False

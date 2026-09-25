@@ -26,6 +26,12 @@ const STATUS_COLORS = {
   revoked: "default",
 };
 
+const RESET_STATUS_LABELS = {
+  pending: "Chờ duyệt",
+  approved: "Đã duyệt",
+  rejected: "Đã từ chối",
+};
+
 function formatDate(value) {
   return value ? new Date(value).toLocaleString() : "—";
 }
@@ -38,6 +44,10 @@ export default function AccessManagementPage() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [resetRows, setResetRows] = useState([]);
+  const [resetFilter, setResetFilter] = useState("pending");
+  const [resetLoading, setResetLoading] = useState(true);
+  const [resetBusyId, setResetBusyId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +74,24 @@ export default function AccessManagementPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadPasswordResets = useCallback(async () => {
+    setResetLoading(true);
+    setError("");
+    try {
+      const query = buildQuery({ status: resetFilter || undefined });
+      const data = await api.get(`/api/v1/admin/password-reset-requests/${query}`);
+      setResetRows(data.results || []);
+    } catch (err) {
+      setError(err.message || "Không thể tải yêu cầu đổi mật khẩu.");
+    } finally {
+      setResetLoading(false);
+    }
+  }, [resetFilter]);
+
+  useEffect(() => {
+    loadPasswordResets();
+  }, [loadPasswordResets]);
 
   async function runAction(row, action) {
     if (
@@ -93,6 +121,37 @@ export default function AccessManagementPage() {
       setError(err.message || "Không thể xử lý yêu cầu.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function runPasswordResetAction(row, action) {
+    if (
+      !window.confirm(
+        action === "approve"
+          ? `Duyệt mật khẩu mới cho ${row.username}? Tất cả phiên đăng nhập cũ sẽ bị thu hồi.`
+          : `Từ chối yêu cầu đổi mật khẩu của ${row.username}?`
+      )
+    ) {
+      return;
+    }
+    setResetBusyId(row.id);
+    setError("");
+    setMessage("");
+    try {
+      await api.post(
+        `/api/v1/admin/password-reset-requests/${row.id}/${action}/`,
+        {}
+      );
+      setMessage(
+        action === "approve"
+          ? `Đã áp dụng mật khẩu mới cho ${row.username}.`
+          : `Đã từ chối yêu cầu đổi mật khẩu của ${row.username}.`
+      );
+      await loadPasswordResets();
+    } catch (err) {
+      setError(err.message || "Không thể xử lý yêu cầu đổi mật khẩu.");
+    } finally {
+      setResetBusyId(null);
     }
   }
 
@@ -199,12 +258,80 @@ export default function AccessManagementPage() {
     [busyId, roles, filter]
   );
 
+  const resetColumns = useMemo(
+    () => [
+      { id: "username", label: "Tên đăng nhập" },
+      {
+        id: "status",
+        label: "Trạng thái",
+        render: (row) => (
+          <Chip
+            size="small"
+            variant="outlined"
+            color={STATUS_COLORS[row.status] || "default"}
+            label={RESET_STATUS_LABELS[row.status] || row.status}
+          />
+        ),
+      },
+      {
+        id: "requested_at",
+        label: "Thời gian yêu cầu",
+        render: (row) => formatDate(row.requested_at),
+      },
+      {
+        id: "review",
+        label: "Người xử lý",
+        render: (row) => (
+          <Stack spacing={0.25}>
+            <Typography variant="body2">{row.reviewed_by || "—"}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {formatDate(row.reviewed_at)}
+            </Typography>
+          </Stack>
+        ),
+      },
+      {
+        id: "actions",
+        label: "Thao tác",
+        nowrap: true,
+        render: (row) =>
+          row.status === "pending" ? (
+            <Stack direction="row" spacing={0.75}>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={resetBusyId === row.id}
+                onClick={() => runPasswordResetAction(row, "approve")}
+              >
+                Duyệt mật khẩu mới
+              </Button>
+              <Button
+                size="small"
+                color="error"
+                disabled={resetBusyId === row.id}
+                onClick={() => runPasswordResetAction(row, "reject")}
+              >
+                Từ chối
+              </Button>
+            </Stack>
+          ) : (
+            "—"
+          ),
+      },
+    ],
+    [resetBusyId, resetFilter]
+  );
+
   return (
     <Stack spacing={2}>
       <PageHeader
         title="Quản lý truy cập"
         action={
-          <Button variant="outlined" onClick={load} disabled={loading}>
+          <Button
+            variant="outlined"
+            onClick={() => Promise.all([load(), loadPasswordResets()])}
+            disabled={loading || resetLoading}
+          >
             Làm mới
           </Button>
         }
@@ -235,6 +362,33 @@ export default function AccessManagementPage() {
         rows={rows}
         columns={columns}
         empty="Không có tài khoản phù hợp."
+      />
+      <Typography variant="h6" sx={{ pt: 2 }}>
+        Yêu cầu đổi mật khẩu
+      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+        <TextField
+          select
+          size="small"
+          label="Trạng thái"
+          value={resetFilter}
+          onChange={(event) => setResetFilter(event.target.value)}
+          sx={{ minWidth: 190 }}
+        >
+          <MenuItem value="">Tất cả</MenuItem>
+          <MenuItem value="pending">Chờ duyệt</MenuItem>
+          <MenuItem value="approved">Đã duyệt</MenuItem>
+          <MenuItem value="rejected">Đã từ chối</MenuItem>
+        </TextField>
+        <Typography variant="body2" color="text.secondary">
+          {resetRows.length} yêu cầu
+        </Typography>
+      </Stack>
+      <DataTable
+        loading={resetLoading}
+        rows={resetRows}
+        columns={resetColumns}
+        empty="Không có yêu cầu đổi mật khẩu phù hợp."
       />
     </Stack>
   );
