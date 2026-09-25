@@ -32,6 +32,13 @@ function SuperuserOnly({ children }) {
   return children;
 }
 
+function StaffOnly({ children }) {
+  const { isStaff, isSuperuser, profileLoading } = useAuth();
+  if (profileLoading) return null;
+  if (!isStaff && !isSuperuser) return <Navigate to="/" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -68,7 +75,14 @@ export default function App() {
         <Route path="/osint" element={<OsintPage />} />
         <Route path="/github-scanner" element={<GithubScannerPage />} />
         <Route path="/logs-scanner" element={<LogsScannerPage />} />
-        <Route path="/dark-web" element={<DarkWebInvestigationsPage />} />
+        <Route
+          path="/dark-web"
+          element={
+            <StaffOnly>
+              <DarkWebInvestigationsPage />
+            </StaffOnly>
+          }
+        />
         <Route path="/policy" element={<PolicyPage />} />
         <Route path="/workers" element={<WorkersPage />} />
         <Route path="/watch-rules" element={<WatchRulesPage />} />

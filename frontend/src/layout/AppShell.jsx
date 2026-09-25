@@ -39,7 +39,12 @@ const NAV = [
   { to: "/feeds", label: "RSS Sources", icon: <RssFeedOutlinedIcon fontSize="small" /> },
   { to: "/leaks", label: "Data Leaks", icon: <WaterDropOutlinedIcon fontSize="small" /> },
   { to: "/logs-scanner", label: "Logs Scanner", icon: <DocumentScannerOutlinedIcon fontSize="small" /> },
-  { to: "/dark-web", label: "Dark Web", icon: <PolicyOutlinedIcon fontSize="small" /> },
+  {
+    to: "/dark-web",
+    label: "Dark Web",
+    icon: <PolicyOutlinedIcon fontSize="small" />,
+    staffOnly: true,
+  },
   { to: "/github-scanner", label: "GitHub Scanner", icon: <GitHubIcon fontSize="small" /> },
   { to: "/intelligence", label: "Tóm tắt AI", icon: <AutoAwesomeOutlinedIcon fontSize="small" /> },
   {
@@ -53,7 +58,7 @@ const NAV = [
 ];
 
 export default function AppShell() {
-  const { authed, username, isSuperuser, logout } = useAuth();
+  const { authed, username, isStaff, isSuperuser, logout } = useAuth();
   const location = useLocation();
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down("md"));
@@ -91,7 +96,11 @@ export default function AppShell() {
       </Box>
       <Divider />
       <List sx={{ px: 1, py: 1.5, flex: 1 }}>
-        {NAV.filter((item) => !item.superuserOnly || isSuperuser).map((item) => {
+        {NAV.filter(
+          (item) =>
+            (!item.staffOnly || isStaff || isSuperuser) &&
+            (!item.superuserOnly || isSuperuser)
+        ).map((item) => {
           const selected =
             item.to === "/"
               ? location.pathname === "/"
